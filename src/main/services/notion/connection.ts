@@ -343,6 +343,7 @@ export class ElectronEncryptionBackend implements EncryptionBackend {
 
   isWeak(): boolean {
     // Linux 환경에서 안전한 키링이 없어 평문(basic_text)으로 암호화하는 방식을 탐지하여 거부합니다. (SRS-FR-002)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const storage = safeStorage as any
     if (typeof storage.getSelectedEncryptionBackend === 'function') {
       return storage.getSelectedEncryptionBackend() === 'basic_text'
