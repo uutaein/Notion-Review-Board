@@ -26,6 +26,7 @@ export function createReviewSource(overrides: Partial<ReviewSource> = {}): Revie
     tagPropertyName: 'Tags',
     sourcePropertyName: 'Origin',
     reviewCheckboxPropertyName: null,
+    lastEditedPropertyName: null,
     filterPropertyName: null,
     filterOperator: null,
     filterValue: null,

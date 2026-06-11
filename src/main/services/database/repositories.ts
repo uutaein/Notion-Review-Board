@@ -31,6 +31,7 @@ function sourceParams(source: ReviewSource): SqlParams {
     tagPropertyName: source.tagPropertyName,
     sourcePropertyName: source.sourcePropertyName,
     reviewCheckboxPropertyName: source.reviewCheckboxPropertyName,
+    lastEditedPropertyName: source.lastEditedPropertyName,
     filterPropertyName: source.filterPropertyName,
     filterOperator: source.filterOperator,
     filterValue: source.filterValue,
@@ -74,12 +75,12 @@ export class ReviewSourceRepository {
         INSERT INTO review_sources (
           id, name, notion_target_id, notion_target_url, notion_target_type, enabled,
           collection_mode, title_property_name, url_property_name, category_property_name,
-          tag_property_name, source_property_name, review_checkbox_property_name,
+          tag_property_name, source_property_name, review_checkbox_property_name, last_edited_property_name,
           filter_property_name, filter_operator, filter_value, last_synced_at, created_at, updated_at
         ) VALUES (
           @id, @name, @notionTargetId, @notionTargetUrl, @notionTargetType, @enabled,
           @collectionMode, @titlePropertyName, @urlPropertyName, @categoryPropertyName,
-          @tagPropertyName, @sourcePropertyName, @reviewCheckboxPropertyName,
+          @tagPropertyName, @sourcePropertyName, @reviewCheckboxPropertyName, @lastEditedPropertyName,
           @filterPropertyName, @filterOperator, @filterValue, @lastSyncedAt, @createdAt, @updatedAt
         )
         ON CONFLICT(id) DO UPDATE SET
@@ -95,6 +96,7 @@ export class ReviewSourceRepository {
           tag_property_name = excluded.tag_property_name,
           source_property_name = excluded.source_property_name,
           review_checkbox_property_name = excluded.review_checkbox_property_name,
+          last_edited_property_name = excluded.last_edited_property_name,
           filter_property_name = excluded.filter_property_name,
           filter_operator = excluded.filter_operator,
           filter_value = excluded.filter_value,
@@ -267,6 +269,7 @@ function mapSource(row: Record<string, unknown>): ReviewSource {
     tagPropertyName: row.tag_property_name as string | null,
     sourcePropertyName: row.source_property_name as string | null,
     reviewCheckboxPropertyName: row.review_checkbox_property_name as string | null,
+    lastEditedPropertyName: row.last_edited_property_name as string | null,
     filterPropertyName: row.filter_property_name as string | null,
     filterOperator: row.filter_operator as ReviewSource['filterOperator'],
     filterValue: row.filter_value as string | null,

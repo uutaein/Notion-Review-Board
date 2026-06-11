@@ -1,0 +1,373 @@
+/**
+ * @file source-mapping.ts
+ * @description Electron 메인 프로세스 내부에서 Review Source 및 Notion 필드 매핑 관련 IPC 이벤트를 안전하게 처리하고
+ * 외부 렌더러 프로세스로부터의 비정상적인 호출을 예방 및 차단하는 보안 레이어입니다.
+ * (SRS-NFR-SEC-008, SRS-NFR-SEC-010)
+ */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { ReviewSourceService } from '../services/source'
+import { NotionSourceMetadataService } from '../services/notion/source-metadata'
+
+/**
+ * IPC 채널 등록 시 주입받아야 하는 의존성 사양입니다.
+ */
+export interface SourceMappingIpcDependencies {
+  /** 복습 소스 서비스 */
+  sourceService: ReviewSourceService
+  /** Notion 메타데이터 서비스 */
+  metadataService: NotionSourceMetadataService
+  /** ipcMain 객체 */
+  ipcMain: {
+    handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void
+  }
+  /** IPC를 트리거한 렌더러 송신처(Sender) 프레임의 권한 및 신뢰성을 체크하는 검증 유틸리티 함수 */
+  isValidSender: (event: unknown) => boolean
+}
+
+/**
+ * 비정상적이거나 예외가 발생한 모든 IPC 호출 오류를 표준화된 에러 응답형식으로 포장하고 내부 디버그 스택 트레이스를 정제합니다. (SEC-010)
+ */
+function sanitizeIpcError(err: unknown): Error {
+  const publicCodes = [
+    'UNAUTHORIZED_SENDER',
+    'INVALID_PAYLOAD',
+    'SOURCE_NOT_FOUND',
+    'DUPLICATE_TARGET',
+    'UNAUTHORIZED',
+    'FORBIDDEN',
+    'NOT_FOUND',
+    'RATE_LIMITED',
+    'NETWORK_ERROR',
+    'INVALID_ITEM_POLICY'
+  ]
+
+  const originalMessage = err instanceof Error ? err.message : ''
+  const cleanMessage = publicCodes.includes(originalMessage) ? originalMessage : 'INTERNAL_ERROR'
+
+  const cleanError = new Error(cleanMessage)
+  cleanError.stack = ''
+  return cleanError
+}
+
+/**
+ * 소스 및 필드 매핑 관련 IPC 핸들러들을 등록합니다.
+ */
+export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependencies): void {
+  const { sourceService, metadataService, ipcMain, isValidSender } = dependencies
+
+  /**
+   * 유효성 검증 데코레이터를 적용한 공용 보안 래퍼 헬퍼 함수입니다.
+   */
+  function secureHandle(
+    handler: (event: unknown, ...args: unknown[]) => Promise<unknown> | unknown
+  ) {
+    return async (event: unknown, ...args: unknown[]) => {
+      try {
+        if (!isValidSender(event)) {
+          throw new Error('UNAUTHORIZED_SENDER')
+        }
+        return await handler(event, ...args)
+      } catch (err) {
+        throw sanitizeIpcError(err)
+      }
+    }
+  }
+
+  /**
+   * 페이로드가 객체 형식이고 지정된 허용 Key들을 초과하지 않는지 철저히 대조 검증합니다.
+   */
+  function validatePayloadKeys(payload: any, allowedKeys: string[]): void {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error('INVALID_PAYLOAD')
+    }
+    const keys = Object.keys(payload)
+    for (const key of keys) {
+      if (!allowedKeys.includes(key)) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+    }
+  }
+
+  // 1. 등록된 모든 복습 소스 목록 조회
+  ipcMain.handle(
+    'source:list',
+    secureHandle((_event, ...args) => {
+      if (args.length !== 0) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      return sourceService.listSources()
+    })
+  )
+
+  // 2. 특정 복습 소스 상세 조회
+  ipcMain.handle(
+    'source:get',
+    secureHandle((_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, ['sourceId'])
+      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      return sourceService.getSource({ sourceId: payload.sourceId })
+    })
+  )
+
+  // 3. 신규 복습 소스 생성
+  ipcMain.handle(
+    'source:create',
+    secureHandle((_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, [
+        'name',
+        'notionTargetUrl',
+        'notionTargetId',
+        'notionTargetType',
+        'enabled',
+        'collectionMode',
+        'titlePropertyName',
+        'urlPropertyName',
+        'categoryPropertyName',
+        'tagPropertyName',
+        'sourcePropertyName',
+        'reviewCheckboxPropertyName',
+        'lastEditedPropertyName',
+        'filterPropertyName',
+        'filterOperator',
+        'filterValue'
+      ])
+
+      // 페이로드 형식 검사
+      if (typeof payload.name !== 'string' || payload.name.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.notionTargetId !== 'string' || payload.notionTargetId.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (payload.notionTargetUrl !== undefined && payload.notionTargetUrl !== null && typeof payload.notionTargetUrl !== 'string') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.enabled !== 'boolean') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (!['tag', 'checkbox', 'all'].includes(payload.collectionMode)) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+
+      return sourceService.createSource(payload)
+    })
+  )
+
+  // 4. 기존 복습 소스 수정
+  ipcMain.handle(
+    'source:update',
+    secureHandle((_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, [
+        'id',
+        'name',
+        'enabled',
+        'collectionMode',
+        'titlePropertyName',
+        'urlPropertyName',
+        'categoryPropertyName',
+        'tagPropertyName',
+        'sourcePropertyName',
+        'reviewCheckboxPropertyName',
+        'lastEditedPropertyName',
+        'filterPropertyName',
+        'filterOperator',
+        'filterValue'
+      ])
+
+      if (typeof payload.id !== 'string' || payload.id.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.name !== 'string' || payload.name.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.enabled !== 'boolean') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (!['tag', 'checkbox', 'all'].includes(payload.collectionMode)) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+
+      return sourceService.updateSource(payload)
+    })
+  )
+
+  // 5. 소스 삭제 시 고아 항목 통계 조회
+  ipcMain.handle(
+    'source:get-delete-impact',
+    secureHandle((_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, ['sourceId'])
+      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      return sourceService.getDeleteImpact({ sourceId: payload.sourceId })
+    })
+  )
+
+  // 6. 복습 소스 삭제
+  ipcMain.handle(
+    'source:delete',
+    secureHandle((_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, ['sourceId', 'itemPolicy'])
+      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (!['archive', 'delete', 'keep-history'].includes(payload.itemPolicy)) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      sourceService.deleteSource({
+        sourceId: payload.sourceId,
+        itemPolicy: payload.itemPolicy
+      })
+      return { success: true }
+    })
+  )
+
+  // 7. 소스 활성/비활성화 토글
+  ipcMain.handle(
+    'source:set-enabled',
+    secureHandle((_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, ['sourceId', 'enabled'])
+      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.enabled !== 'boolean') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      return sourceService.setSourceEnabled({
+        sourceId: payload.sourceId,
+        enabled: payload.enabled
+      })
+    })
+  )
+
+  // 8. Notion 대상 URL/ID 식별
+  ipcMain.handle(
+    'notion:resolve-target',
+    secureHandle(async (_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, ['target'])
+      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      return await metadataService.resolveTarget({ target: payload.target })
+    })
+  )
+
+  // 9. Notion 속성 스키마 조회
+  ipcMain.handle(
+    'notion:list-properties',
+    secureHandle(async (_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, ['target'])
+      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      return await metadataService.listProperties({ target: payload.target })
+    })
+  )
+
+  // 10. 필드 매핑 규칙 검증
+  ipcMain.handle(
+    'notion:validate-mapping',
+    secureHandle(async (_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, [
+        'target',
+        'collectionMode',
+        'titlePropertyName',
+        'urlPropertyName',
+        'categoryPropertyName',
+        'tagPropertyName',
+        'sourcePropertyName',
+        'reviewCheckboxPropertyName',
+        'lastEditedPropertyName',
+        'filterPropertyName',
+        'filterOperator'
+      ])
+
+      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (!['tag', 'checkbox', 'all'].includes(payload.collectionMode)) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+
+      return await metadataService.validateMapping(payload)
+    })
+  )
+
+  // 11. 필드 매핑 프리뷰 조회
+  ipcMain.handle(
+    'notion:preview-mapping',
+    secureHandle(async (_event, ...args) => {
+      if (args.length !== 1) {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      const payload = args[0] as any
+      validatePayloadKeys(payload, [
+        'target',
+        'titlePropertyName',
+        'urlPropertyName',
+        'categoryPropertyName',
+        'tagPropertyName',
+        'sourcePropertyName',
+        'reviewCheckboxPropertyName',
+        'lastEditedPropertyName'
+      ])
+
+      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
+        throw new Error('INVALID_PAYLOAD')
+      }
+
+      return await metadataService.previewMapping(payload)
+    })
+  )
+}

@@ -86,6 +86,12 @@ const migrations: Migration[] = [
       CREATE INDEX idx_sync_events_occurred_at ON sync_events(occurred_at DESC);
       CREATE INDEX idx_sync_events_source_id ON sync_events(source_id);
     `
+  },
+  {
+    version: 2,
+    up: `
+      ALTER TABLE review_sources ADD COLUMN last_edited_property_name TEXT;
+    `
   }
 ]
 

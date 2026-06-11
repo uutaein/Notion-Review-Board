@@ -11,6 +11,13 @@ import {
   ProductionNotionConnectionClient
 } from './services/notion/connection'
 import { registerNotionConnectionIpc } from './ipc/notion-connection'
+import { createReviewSourceService } from './services/source'
+import {
+  createNotionSourceMetadataService,
+  ProductionNotionTargetResolver,
+  ProductionNotionMetadataClient
+} from './services/notion/source-metadata'
+import { registerSourceMappingIpc } from './ipc/source-mapping'
 
 let database: DatabaseService | null = null
 
@@ -129,6 +136,23 @@ app.whenReady().then(() => {
   // Notion 연결 관련 IPC 채널 활성화 등록
   registerNotionConnectionIpc({
     service: notionConnectionService,
+    ipcMain,
+    isValidSender
+  })
+
+  // Review Source 및 Notion 메타데이터 서비스 초기화
+  const sourceService = createReviewSourceService({ database: database! })
+  const metadataResolver = new ProductionNotionTargetResolver(vault)
+  const metadataClient = new ProductionNotionMetadataClient(vault)
+  const metadataService = createNotionSourceMetadataService({
+    resolver: metadataResolver,
+    client: metadataClient
+  })
+
+  // Review Source 및 필드 매핑 관련 IPC 채널 활성화 등록
+  registerSourceMappingIpc({
+    sourceService,
+    metadataService,
     ipcMain,
     isValidSender
   })

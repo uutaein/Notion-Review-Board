@@ -11,6 +11,7 @@ export interface FieldMapping {
   tagPropertyName: string | null
   sourcePropertyName: string | null
   reviewCheckboxPropertyName: string | null
+  lastEditedPropertyName: string | null
 }
 
 export interface ReviewSource {
@@ -29,6 +30,7 @@ export interface ReviewSource {
   tagPropertyName: string | null
   sourcePropertyName: string | null
   reviewCheckboxPropertyName: string | null
+  lastEditedPropertyName: string | null
 
   // Collection filters
   filterPropertyName: string | null

@@ -46,6 +46,7 @@ describe('Notion Review Board Domain Layer Tests', () => {
         tagPropertyName: null,
         sourcePropertyName: null,
         reviewCheckboxPropertyName: null,
+        lastEditedPropertyName: null,
         filterPropertyName: null,
         filterOperator: null,
         filterValue: null,
