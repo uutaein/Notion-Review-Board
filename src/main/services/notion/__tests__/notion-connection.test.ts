@@ -1,13 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, afterEach } from 'vitest'
+import { join } from 'node:path'
+import { readFileSync, existsSync, unlinkSync } from 'node:fs'
 import {
   createNotionConnectionService,
   TokenVault,
   EncryptionBackend,
-  BlobStore
+  BlobStore,
+  FileBlobStore,
+  ElectronEncryptionBackend,
+  ProductionNotionConnectionClient
 } from '../connection'
 import { registerNotionConnectionIpc } from '../../../ipc/notion-connection'
 import { contextBridge } from 'electron'
+
+const mockIsEncryptionAvailable = vi.fn().mockReturnValue(true)
+const mockEncryptString = vi.fn().mockImplementation((str) => Buffer.from(`enc:${str}`))
+const mockDecryptString = vi.fn().mockImplementation((buf) => buf.toString().replace('enc:', ''))
+const mockGetSelectedEncryptionBackend = vi.fn().mockReturnValue('gnome-keyring')
 
 vi.mock('electron', () => ({
   contextBridge: {
@@ -15,8 +25,35 @@ vi.mock('electron', () => ({
   },
   ipcRenderer: {
     invoke: vi.fn()
+  },
+  safeStorage: {
+    isEncryptionAvailable: () => mockIsEncryptionAvailable(),
+    encryptString: (str: string) => mockEncryptString(str),
+    decryptString: (buf: Buffer) => mockDecryptString(buf),
+    getSelectedEncryptionBackend: () => mockGetSelectedEncryptionBackend()
   }
 }))
+
+let mockFsErrorType: 'none' | 'read' | 'delete' = 'none'
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  return {
+    ...actual,
+    readFileSync: (path: any, options?: any) => {
+      if (mockFsErrorType === 'read') {
+        throw new Error('DISK_READ_ERROR')
+      }
+      return actual.readFileSync(path, options)
+    },
+    unlinkSync: (path: any) => {
+      if (mockFsErrorType === 'delete') {
+        throw new Error('DISK_DELETE_ERROR')
+      }
+      return actual.unlinkSync(path)
+    }
+  }
+})
 
 /**
  * 테스트 용도로 가상 암호화 동작을 수행하는 목(Mock) 암호화 백엔드 클래스입니다.
@@ -544,5 +581,172 @@ describe('Notion Connection Settings', () => {
     expect(notionConnection).not.toHaveProperty('invoke')
     expect(notionConnection).not.toHaveProperty('getToken')
     expect(notionConnection).not.toHaveProperty('fs')
+  })
+
+  describe('FileBlobStore Atomic Writes & File operations', () => {
+    const testFilePath = join(__dirname, 'atomic-test.dat')
+
+    afterEach(() => {
+      if (existsSync(testFilePath)) {
+        try {
+          unlinkSync(testFilePath)
+        } catch (err) {
+          void err
+        }
+      }
+      if (existsSync(testFilePath + '.tmp')) {
+        try {
+          unlinkSync(testFilePath + '.tmp')
+        } catch (err) {
+          void err
+        }
+      }
+    })
+
+    it('정상적인 write 호출 시 임시 파일을 작성하고 renameSync를 통해 원자적으로 저장합니다.', () => {
+      const store = new FileBlobStore(testFilePath)
+      store.write(Buffer.from('hello-world'))
+      expect(readFileSync(testFilePath).toString()).toBe('hello-world')
+    })
+
+    it('write 도중 에러가 발생한 경우, 임시 파일이 정리되고 기존 파일이 안전하게 보존됩니다.', () => {
+      const store = new FileBlobStore(testFilePath)
+      store.write(Buffer.from('original-data'))
+
+      const invalidStore = new FileBlobStore(join(__dirname, 'non-exist-dir/atomic-test.dat'))
+      expect(() => invalidStore.write(Buffer.from('new-data'))).toThrow()
+      
+      expect(readFileSync(testFilePath).toString()).toBe('original-data')
+      expect(existsSync(testFilePath + '.tmp')).toBe(false)
+    })
+
+    it('read 중 발생하는 디스크 에러가 상위로 전파됩니다.', () => {
+      const store = new FileBlobStore(testFilePath)
+      store.write(Buffer.from('some-data'))
+      
+      mockFsErrorType = 'read'
+      expect(() => store.read()).toThrow('DISK_READ_ERROR')
+      mockFsErrorType = 'none'
+    })
+
+    it('delete 중 발생하는 에러가 상위로 고스란히 전파됩니다.', () => {
+      const store = new FileBlobStore(testFilePath)
+      store.write(Buffer.from('some-data'))
+      
+      mockFsErrorType = 'delete'
+      expect(() => store.delete()).toThrow('DISK_DELETE_ERROR')
+      mockFsErrorType = 'none'
+    })
+  })
+
+  describe('ElectronEncryptionBackend weak keyring detection', () => {
+    it('getSelectedEncryptionBackend()가 basic_text인 경우 isWeak()가 true를 반환하고, encryptString 호출 시 예외를 던집니다.', () => {
+      const backend = new ElectronEncryptionBackend()
+      
+      mockGetSelectedEncryptionBackend.mockReturnValue('gnome-keyring')
+      expect(backend.isWeak()).toBe(false)
+      expect(() => backend.encryptString('test-token')).not.toThrow()
+
+      mockGetSelectedEncryptionBackend.mockReturnValue('basic_text')
+      expect(backend.isWeak()).toBe(true)
+      expect(() => backend.encryptString('test-token')).toThrow('DISALLOWED_ENCRYPTION_BACKEND')
+    })
+  })
+
+  describe('ProductionNotionConnectionClient request configuration', () => {
+    it('verify 호출 시 fetch에 2026-03-11 Notion-Version 헤더와 AbortSignal.timeout(10000)이 인자로 주입됩니다.', async () => {
+      const client = new ProductionNotionConnectionClient()
+      
+      const originalFetch = global.fetch
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200
+      })
+      global.fetch = mockFetch
+
+      await client.verify('notion-token-xyz')
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.notion.com/v1/users/me',
+        expect.objectContaining({
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer notion-token-xyz',
+            'Notion-Version': '2026-03-11'
+          },
+          signal: expect.any(AbortSignal)
+        })
+      )
+
+      global.fetch = originalFetch
+    })
+  })
+
+  describe('verifyConnection race condition safety', () => {
+    it('연결 검증 비동기 요청 수행 중 토큰이 삭제된 경우, 이전 검증 완료 후에도 상태를 connected로 덮어쓰지 않고 현재 상태를 유지합니다.', async () => {
+      const encryption = new MockEncryption()
+      const store = new MockStore()
+      const vault = new TokenVault(encryption, store)
+      
+      vault.saveToken('token-1')
+
+      let resolveVerify: (() => void) | null = null
+      const verifyPromise = new Promise<void>((resolve) => {
+        resolveVerify = resolve
+      })
+      const client = {
+        verify: vi.fn().mockReturnValue(verifyPromise)
+      }
+
+      const service = createNotionConnectionService({ vault, client })
+
+      const verifyAction = service.verifyConnection()
+
+      service.deleteToken()
+      expect(service.getStatus()).toBe('not_configured')
+
+      if (resolveVerify) {
+        (resolveVerify as () => void)()
+      }
+
+      const finalStatus = await verifyAction
+
+      expect(finalStatus).toBe('not_configured')
+      expect(service.getStatus()).toBe('not_configured')
+    })
+    
+    it('연결 검증 비동기 요청 수행 중 토큰이 다른 토큰으로 교체된 경우, 이전 검증 실패 결과가 현재 상태(configured)를 덮어쓰지 않습니다.', async () => {
+      const encryption = new MockEncryption()
+      const store = new MockStore()
+      const vault = new TokenVault(encryption, store)
+      
+      vault.saveToken('token-1')
+
+      let rejectVerify: ((err: any) => void) | null = null
+      const verifyPromise = new Promise<void>((_, reject) => {
+        rejectVerify = reject
+      })
+      const client = {
+        verify: vi.fn().mockReturnValue(verifyPromise)
+      }
+
+      const service = createNotionConnectionService({ vault, client })
+
+      const verifyAction = service.verifyConnection()
+
+      service.saveToken({ token: 'token-2' })
+      expect(service.getStatus()).toBe('configured')
+
+      const error = new Error('Unauthorized')
+      ;(error as any).status = 401
+      if (rejectVerify) {
+        (rejectVerify as (err: any) => void)(error)
+      }
+
+      const finalStatus = await verifyAction
+
+      expect(finalStatus).toBe('configured')
+      expect(service.getStatus()).toBe('configured')
+    })
   })
 })

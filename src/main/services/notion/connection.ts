@@ -3,7 +3,7 @@
  * @description Notion API 연동 토큰의 보안 저장(암호화), 제거, 상태 조회 및 연결 상태 검증을 수행하는
  * 메인 프로세스 내부의 비즈니스 서비스 구현체입니다. (SRS-FR-001 ~ SRS-FR-003, SRS-NFR-SEC-006)
  */
-import { writeFileSync, readFileSync, existsSync, unlinkSync } from 'node:fs'
+import { writeFileSync, readFileSync, existsSync, unlinkSync, renameSync } from 'node:fs'
 import { safeStorage } from 'electron'
 
 /**
@@ -76,22 +76,11 @@ export class TokenVault {
       throw new Error('INVALID_PAYLOAD')
     }
 
-    // 원자적 교체를 위해 기존에 저장되어 있던 값을 안전하게 먼저 보관해 둡니다.
-    const oldBlob = this.store.read()
-
     try {
       // 토큰 원본이 그대로 노출되지 않도록 영속 저장소 쓰기 작업 전에 암호화를 마칩니다. (TC-NOTION-CONN-001/002)
       const encrypted = this.encryption.encryptString(token)
       this.store.write(encrypted)
     } catch {
-      // 쓰기 및 암호화 도중 예외가 발생한 경우, 이전 정상 상태 데이터를 원상 복구합니다. (TC-NOTION-CONN-005)
-      if (oldBlob) {
-        try {
-          this.store.write(oldBlob)
-        } catch {
-          // 복구 실패 예외는 무시
-        }
-      }
       throw new Error('PERSISTENCE_ERROR')
     }
   }
@@ -247,11 +236,21 @@ export function createNotionConnectionService(
       try {
         // Notion 서버로 경량 API 요청을 보냅니다.
         await client.verify(token)
+        
+        // 검증 요청이 진행되는 사이에 다른 토큰으로 교체되거나 삭제되었는지 경쟁상태를 판단합니다.
+        if (vault.getToken() !== token) {
+          return currentStatus
+        }
 
         currentStatus = 'connected'
         logger?.info('Notion 연결성이 완벽하게 검증되었습니다. 상태: connected')
         return currentStatus
       } catch (err: unknown) {
+        // 동시성/비동기 경쟁상태 해결: 대기 중 토큰 정보가 변경된 경우 이전 검증 실패 결과값은 무시합니다.
+        if (vault.getToken() !== token) {
+          return currentStatus
+        }
+
         // 에러 코드 스펙을 분석하여 렌더러 대응 상태코드로 안전하게 매핑합니다.
         let statusResult: NotionConnectionStatus
 
@@ -289,25 +288,34 @@ export class FileBlobStore implements BlobStore {
   }
 
   write(blob: Buffer): void {
-    writeFileSync(this.filePath, blob)
+    const tempPath = this.filePath + '.tmp'
+    try {
+      // 1. 임시 파일에 새 복사본 데이터를 작성하여 프로세스 비정상 종료 시 원본 손상을 예방합니다.
+      writeFileSync(tempPath, blob)
+      // 2. 운영체제의 원자적(Atomic) rename 연산을 수행하여 교체를 완료합니다.
+      renameSync(tempPath, this.filePath)
+    } catch (err) {
+      if (existsSync(tempPath)) {
+        try {
+          unlinkSync(tempPath)
+        } catch {
+          // 무시
+        }
+      }
+      throw err
+    }
   }
 
   read(): Buffer | null {
     if (!existsSync(this.filePath)) return null
-    try {
-      return readFileSync(this.filePath)
-    } catch {
-      return null
-    }
+    // 읽기 과정 중 디스크 에러 등이 발생하면 예외가 상위 수준으로 전파되도록 throw를 보장합니다.
+    return readFileSync(this.filePath)
   }
 
   delete(): void {
     if (existsSync(this.filePath)) {
-      try {
-        unlinkSync(this.filePath)
-      } catch {
-        // 무시
-      }
+      // 삭제 실패 오류를 상위 서비스 레이어로 고스란히 노출하여 오작동(성공 표시)을 원천 차단합니다.
+      unlinkSync(this.filePath)
     }
   }
 }
@@ -323,11 +331,23 @@ export class ElectronEncryptionBackend implements EncryptionBackend {
   }
 
   encryptString(plainText: string): Buffer {
+    if (this.isWeak()) {
+      throw new Error('DISALLOWED_ENCRYPTION_BACKEND')
+    }
     return safeStorage.encryptString(plainText)
   }
 
   decryptString(cipherText: Buffer): string {
     return safeStorage.decryptString(cipherText)
+  }
+
+  isWeak(): boolean {
+    // Linux 환경에서 안전한 키링이 없어 평문(basic_text)으로 암호화하는 방식을 탐지하여 거부합니다. (SRS-FR-002)
+    const storage = safeStorage as any
+    if (typeof storage.getSelectedEncryptionBackend === 'function') {
+      return storage.getSelectedEncryptionBackend() === 'basic_text'
+    }
+    return false
   }
 }
 
@@ -340,8 +360,10 @@ export class ProductionNotionConnectionClient implements NotionConnectionClient 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Notion-Version': '2022-06-28'
-      }
+        'Notion-Version': '2026-03-11'
+      },
+      // 10초 이내에 연결 검증이 완료되지 않으면 타임아웃 오류를 발생시켜 대기 누수를 제어합니다.
+      signal: AbortSignal.timeout(10000)
     })
     if (!response.ok) {
       const error = new Error(`HTTP error ${response.status}`)

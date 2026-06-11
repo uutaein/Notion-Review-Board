@@ -1,4 +1,5 @@
-import { join } from 'node:path'
+import { join, normalize } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { createDatabaseService, type DatabaseService } from './services/database'
@@ -30,6 +31,35 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow.show())
+
+  // 외부 도메인이나 신뢰할 수 없는 로컬 리다이렉션을 방지하기 위해 창 내에서의 불필요한 내비게이션을 전면 차단합니다.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    let allowed = false
+    if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+      try {
+        const allowedOrigin = new URL(process.env.ELECTRON_RENDERER_URL).origin
+        const targetOrigin = new URL(url).origin
+        if (allowedOrigin === targetOrigin) {
+          allowed = true
+        }
+      } catch {
+        allowed = false
+      }
+    } else {
+      try {
+        const targetPath = normalize(fileURLToPath(url)).toLowerCase()
+        const expectedPath = normalize(join(__dirname, '../renderer/index.html')).toLowerCase()
+        if (targetPath === expectedPath) {
+          allowed = true
+        }
+      } catch {
+        allowed = false
+      }
+    }
+    if (!allowed) {
+      event.preventDefault()
+    }
+  })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) {
@@ -68,18 +98,31 @@ app.whenReady().then(() => {
   const client = new ProductionNotionConnectionClient()
   const notionConnectionService = createNotionConnectionService({ vault, client })
 
-  // 안전한 IPC 송신처 검증 함수 정의
+  // 안전한 IPC 송신처 검증 함수 정의 (Electron 권고에 따라 URL 파서로 정확한 origin/path를 allowlist)
   const isValidSender = (event: unknown): boolean => {
     const ev = event as { senderFrame?: { url: string } }
     const senderFrame = ev.senderFrame
-    if (!senderFrame) return false
-    if (
-      senderFrame.url.startsWith('file://') ||
-      (process.env.ELECTRON_RENDERER_URL &&
-        senderFrame.url.startsWith(process.env.ELECTRON_RENDERER_URL))
-    ) {
-      return true
+    if (!senderFrame?.url) return false
+
+    try {
+      const parsedUrl = new URL(senderFrame.url)
+
+      // 개발 모드인 경우 렌더러 개발 주소(ELECTRON_RENDERER_URL)의 origin과 정확히 매칭되는지 판정합니다.
+      if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+        const devUrl = new URL(process.env.ELECTRON_RENDERER_URL)
+        return parsedUrl.origin === devUrl.origin
+      }
+
+      // 프로덕션 모드인 경우 디렉토리 내 index.html의 로컬 파일 경로와 완벽히 대소문자 없이 매칭되는지 판정합니다.
+      if (parsedUrl.protocol === 'file:') {
+        const filePath = normalize(fileURLToPath(senderFrame.url)).toLowerCase()
+        const expectedPath = normalize(join(__dirname, '../renderer/index.html')).toLowerCase()
+        return filePath === expectedPath
+      }
+    } catch {
+      return false
     }
+
     return false
   }
 
