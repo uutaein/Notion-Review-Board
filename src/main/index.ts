@@ -1,6 +1,9 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
+import { createDatabaseService, type DatabaseService } from './services/database'
+
+let database: DatabaseService | null = null
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -36,6 +39,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.notion-review-board.app')
+  database = createDatabaseService(join(app.getPath('userData'), 'notion-review-board.sqlite'))
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
@@ -58,4 +62,9 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  database?.close()
+  database = null
 })
