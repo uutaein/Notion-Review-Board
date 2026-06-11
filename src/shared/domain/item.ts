@@ -7,6 +7,7 @@ export type ReviewItemStatus =
   | 'deleted'
   | 'sync_error'
   | 'archived'
+  | 'orphaned'
 
 export interface FsrsState {
   version: string
@@ -85,7 +86,7 @@ export function isValidStatusTransition(
 
   switch (from) {
     case 'active':
-      return ['active', 'changed', 'missing', 'sync_error', 'archived'].includes(to)
+      return ['active', 'changed', 'missing', 'sync_error', 'archived', 'orphaned'].includes(to)
     case 'changed':
       return to === 'active'
     case 'missing':
@@ -95,6 +96,8 @@ export function isValidStatusTransition(
     case 'sync_error':
       return to === 'active'
     case 'archived':
+      return false
+    case 'orphaned':
       return false
     default:
       return false

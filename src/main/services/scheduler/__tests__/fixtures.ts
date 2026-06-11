@@ -27,6 +27,7 @@ export function createReviewSource(): ReviewSource {
     tagPropertyName: 'Tags',
     sourcePropertyName: null,
     reviewCheckboxPropertyName: null,
+    lastEditedPropertyName: null,
     filterPropertyName: null,
     filterOperator: null,
     filterValue: null,

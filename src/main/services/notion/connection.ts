@@ -236,7 +236,7 @@ export function createNotionConnectionService(
       try {
         // Notion 서버로 경량 API 요청을 보냅니다.
         await client.verify(token)
-        
+
         // 검증 요청이 진행되는 사이에 다른 토큰으로 교체되거나 삭제되었는지 경쟁상태를 판단합니다.
         if (vault.getToken() !== token) {
           return currentStatus

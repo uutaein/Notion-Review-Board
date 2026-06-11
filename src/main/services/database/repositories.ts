@@ -31,12 +31,14 @@ function sourceParams(source: ReviewSource): SqlParams {
     tagPropertyName: source.tagPropertyName,
     sourcePropertyName: source.sourcePropertyName,
     reviewCheckboxPropertyName: source.reviewCheckboxPropertyName,
+    lastEditedPropertyName: source.lastEditedPropertyName,
     filterPropertyName: source.filterPropertyName,
     filterOperator: source.filterOperator,
     filterValue: source.filterValue,
     lastSyncedAt: source.lastSyncedAt,
     createdAt: source.createdAt,
-    updatedAt: source.updatedAt
+    updatedAt: source.updatedAt,
+    deletedAt: source.deletedAt || null
   }
 }
 
@@ -67,52 +69,75 @@ function itemParams(item: ReviewItem): SqlParams {
 export class ReviewSourceRepository {
   constructor(private readonly database: Database.Database) {}
 
-  save(source: ReviewSource): void {
+  insert(source: ReviewSource): void {
     this.database
       .prepare(
         `
         INSERT INTO review_sources (
           id, name, notion_target_id, notion_target_url, notion_target_type, enabled,
           collection_mode, title_property_name, url_property_name, category_property_name,
-          tag_property_name, source_property_name, review_checkbox_property_name,
-          filter_property_name, filter_operator, filter_value, last_synced_at, created_at, updated_at
+          tag_property_name, source_property_name, review_checkbox_property_name, last_edited_property_name,
+          filter_property_name, filter_operator, filter_value, last_synced_at, created_at, updated_at, deleted_at
         ) VALUES (
           @id, @name, @notionTargetId, @notionTargetUrl, @notionTargetType, @enabled,
           @collectionMode, @titlePropertyName, @urlPropertyName, @categoryPropertyName,
-          @tagPropertyName, @sourcePropertyName, @reviewCheckboxPropertyName,
-          @filterPropertyName, @filterOperator, @filterValue, @lastSyncedAt, @createdAt, @updatedAt
+          @tagPropertyName, @sourcePropertyName, @reviewCheckboxPropertyName, @lastEditedPropertyName,
+          @filterPropertyName, @filterOperator, @filterValue, @lastSyncedAt, @createdAt, @updatedAt, @deletedAt
         )
-        ON CONFLICT(id) DO UPDATE SET
-          name = excluded.name,
-          notion_target_id = excluded.notion_target_id,
-          notion_target_url = excluded.notion_target_url,
-          notion_target_type = excluded.notion_target_type,
-          enabled = excluded.enabled,
-          collection_mode = excluded.collection_mode,
-          title_property_name = excluded.title_property_name,
-          url_property_name = excluded.url_property_name,
-          category_property_name = excluded.category_property_name,
-          tag_property_name = excluded.tag_property_name,
-          source_property_name = excluded.source_property_name,
-          review_checkbox_property_name = excluded.review_checkbox_property_name,
-          filter_property_name = excluded.filter_property_name,
-          filter_operator = excluded.filter_operator,
-          filter_value = excluded.filter_value,
-          last_synced_at = excluded.last_synced_at,
-          updated_at = excluded.updated_at
       `
       )
       .run(sourceParams(source))
   }
 
+  update(source: ReviewSource): void {
+    this.database
+      .prepare(
+        `
+        UPDATE review_sources SET
+          name = @name,
+          notion_target_id = @notionTargetId,
+          notion_target_url = @notionTargetUrl,
+          notion_target_type = @notionTargetType,
+          enabled = @enabled,
+          collection_mode = @collectionMode,
+          title_property_name = @titlePropertyName,
+          url_property_name = @urlPropertyName,
+          category_property_name = @categoryPropertyName,
+          tag_property_name = @tagPropertyName,
+          source_property_name = @sourcePropertyName,
+          review_checkbox_property_name = @reviewCheckboxPropertyName,
+          last_edited_property_name = @lastEditedPropertyName,
+          filter_property_name = @filterPropertyName,
+          filter_operator = @filterOperator,
+          filter_value = @filterValue,
+          last_synced_at = @lastSyncedAt,
+          updated_at = @updatedAt,
+          deleted_at = @deletedAt
+        WHERE id = @id
+      `
+      )
+      .run(sourceParams(source))
+  }
+
+  save(source: ReviewSource): void {
+    const row = this.database.prepare('SELECT id FROM review_sources WHERE id = ?').get(source.id)
+    if (row) {
+      this.update(source)
+    } else {
+      this.insert(source)
+    }
+  }
+
   findById(id: string): ReviewSource | null {
-    const row = this.database.prepare('SELECT * FROM review_sources WHERE id = ?').get(id)
+    const row = this.database
+      .prepare('SELECT * FROM review_sources WHERE id = ? AND deleted_at IS NULL')
+      .get(id)
     return row ? mapSource(row as Record<string, unknown>) : null
   }
 
   findAll(): ReviewSource[] {
     return this.database
-      .prepare('SELECT * FROM review_sources ORDER BY created_at, id')
+      .prepare('SELECT * FROM review_sources WHERE deleted_at IS NULL ORDER BY created_at, id')
       .all()
       .map((row) => mapSource(row as Record<string, unknown>))
   }
@@ -267,12 +292,14 @@ function mapSource(row: Record<string, unknown>): ReviewSource {
     tagPropertyName: row.tag_property_name as string | null,
     sourcePropertyName: row.source_property_name as string | null,
     reviewCheckboxPropertyName: row.review_checkbox_property_name as string | null,
+    lastEditedPropertyName: row.last_edited_property_name as string | null,
     filterPropertyName: row.filter_property_name as string | null,
     filterOperator: row.filter_operator as ReviewSource['filterOperator'],
     filterValue: row.filter_value as string | null,
     lastSyncedAt: row.last_synced_at as ReviewSource['lastSyncedAt'],
     createdAt: row.created_at as ReviewSource['createdAt'],
-    updatedAt: row.updated_at as ReviewSource['updatedAt']
+    updatedAt: row.updated_at as ReviewSource['updatedAt'],
+    deletedAt: row.deleted_at as ReviewSource['deletedAt']
   }
 }
 

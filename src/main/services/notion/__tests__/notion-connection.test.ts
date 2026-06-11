@@ -615,7 +615,7 @@ describe('Notion Connection Settings', () => {
 
       const invalidStore = new FileBlobStore(join(__dirname, 'non-exist-dir/atomic-test.dat'))
       expect(() => invalidStore.write(Buffer.from('new-data'))).toThrow()
-      
+
       expect(readFileSync(testFilePath).toString()).toBe('original-data')
       expect(existsSync(testFilePath + '.tmp')).toBe(false)
     })
@@ -623,7 +623,7 @@ describe('Notion Connection Settings', () => {
     it('read 중 발생하는 디스크 에러가 상위로 전파됩니다.', () => {
       const store = new FileBlobStore(testFilePath)
       store.write(Buffer.from('some-data'))
-      
+
       mockFsErrorType = 'read'
       expect(() => store.read()).toThrow('DISK_READ_ERROR')
       mockFsErrorType = 'none'
@@ -632,7 +632,7 @@ describe('Notion Connection Settings', () => {
     it('delete 중 발생하는 에러가 상위로 고스란히 전파됩니다.', () => {
       const store = new FileBlobStore(testFilePath)
       store.write(Buffer.from('some-data'))
-      
+
       mockFsErrorType = 'delete'
       expect(() => store.delete()).toThrow('DISK_DELETE_ERROR')
       mockFsErrorType = 'none'
@@ -642,7 +642,7 @@ describe('Notion Connection Settings', () => {
   describe('ElectronEncryptionBackend weak keyring detection', () => {
     it('getSelectedEncryptionBackend()가 basic_text인 경우 isWeak()가 true를 반환하고, encryptString 호출 시 예외를 던집니다.', () => {
       const backend = new ElectronEncryptionBackend()
-      
+
       mockGetSelectedEncryptionBackend.mockReturnValue('gnome-keyring')
       expect(backend.isWeak()).toBe(false)
       expect(() => backend.encryptString('test-token')).not.toThrow()
@@ -656,7 +656,7 @@ describe('Notion Connection Settings', () => {
   describe('ProductionNotionConnectionClient request configuration', () => {
     it('verify 호출 시 fetch에 2026-03-11 Notion-Version 헤더와 AbortSignal.timeout(10000)이 인자로 주입됩니다.', async () => {
       const client = new ProductionNotionConnectionClient()
-      
+
       const originalFetch = global.fetch
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -687,7 +687,7 @@ describe('Notion Connection Settings', () => {
       const encryption = new MockEncryption()
       const store = new MockStore()
       const vault = new TokenVault(encryption, store)
-      
+
       vault.saveToken('token-1')
 
       let resolveVerify: (() => void) | null = null
@@ -706,7 +706,7 @@ describe('Notion Connection Settings', () => {
       expect(service.getStatus()).toBe('not_configured')
 
       if (resolveVerify) {
-        (resolveVerify as () => void)()
+        ;(resolveVerify as () => void)()
       }
 
       const finalStatus = await verifyAction
@@ -714,12 +714,12 @@ describe('Notion Connection Settings', () => {
       expect(finalStatus).toBe('not_configured')
       expect(service.getStatus()).toBe('not_configured')
     })
-    
+
     it('연결 검증 비동기 요청 수행 중 토큰이 다른 토큰으로 교체된 경우, 이전 검증 실패 결과가 현재 상태(configured)를 덮어쓰지 않습니다.', async () => {
       const encryption = new MockEncryption()
       const store = new MockStore()
       const vault = new TokenVault(encryption, store)
-      
+
       vault.saveToken('token-1')
 
       let rejectVerify: ((err: any) => void) | null = null
@@ -740,7 +740,7 @@ describe('Notion Connection Settings', () => {
       const error = new Error('Unauthorized')
       ;(error as any).status = 401
       if (rejectVerify) {
-        (rejectVerify as (err: any) => void)(error)
+        ;(rejectVerify as (err: any) => void)(error)
       }
 
       const finalStatus = await verifyAction

@@ -31,12 +31,14 @@ function source(): ReviewSource {
     tagPropertyName: 'Tags',
     sourcePropertyName: null,
     reviewCheckboxPropertyName: null,
+    lastEditedPropertyName: null,
     filterPropertyName: null,
     filterOperator: null,
     filterValue: null,
     lastSyncedAt: null,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    deletedAt: null
   }
 }
 
@@ -100,7 +102,7 @@ describe('database service', () => {
     })
     expect(
       database.connection.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()
-    ).toEqual({ count: 1 })
+    ).toEqual({ count: 4 })
   })
 
   it('returns only active due items in schedule order', () => {
