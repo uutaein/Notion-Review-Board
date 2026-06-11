@@ -4,9 +4,15 @@
  * 한국어 JSDoc 및 주석 규칙을 준수하여 작성되었습니다. (SRS-FR-010 ~ SRS-FR-013)
  */
 
-import type { ReviewSource, CollectionMode, NotionTargetType, FilterOperator } from '../../../shared/domain/source'
+import type {
+  ReviewSource,
+  CollectionMode,
+  NotionTargetType,
+  FilterOperator
+} from '../../../shared/domain/source'
 import type { ReviewSourceId, NotionTargetId, DateTimeString } from '../../../shared/domain/types'
 import type { DatabaseService } from '../database'
+import type { NotionTargetResolver } from '../notion/source-metadata'
 
 /**
  * Source 삭제 시 영향을 받는 복습 항목의 통계 구조체입니다.
@@ -44,7 +50,7 @@ export interface ReviewSourceService {
     filterPropertyName?: string | null
     filterOperator?: FilterOperator | null
     filterValue?: string | null
-  }): ReviewSource
+  }): Promise<ReviewSource>
   /** 기존 복습 소스의 설정을 변경하고 갱신합니다. */
   updateSource(input: {
     id: string
@@ -80,7 +86,7 @@ export interface ReviewSourceService {
 export function normalizeNotionTargetId(input: string): string {
   if (!input) return ''
   const trimmed = input.trim()
-  
+
   // URL 형태인 경우 패스 추출
   let uuidPart = trimmed
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
@@ -88,7 +94,7 @@ export function normalizeNotionTargetId(input: string): string {
       const url = new URL(trimmed)
       const pathParts = url.pathname.split('/')
       // 경로의 마지막 부분 또는 뒤에서 두 번째 부분에서 32자리 UUID를 찾습니다.
-      const match = pathParts.find(p => p.replace(/-/g, '').length === 32)
+      const match = pathParts.find((p) => p.replace(/-/g, '').length === 32)
       if (match) {
         uuidPart = match
       } else {
@@ -112,9 +118,9 @@ export function normalizeNotionTargetId(input: string): string {
   if (hex32Regex.test(cleaned)) {
     return cleaned
   }
-  
-  // 정규화 실패 시 원본에서 대시만 뺀 문자열 반환
-  return cleaned
+
+  // 정규화 실패 시 빈 문자열 반환
+  return ''
 }
 
 /**
@@ -122,12 +128,13 @@ export function normalizeNotionTargetId(input: string): string {
  */
 export function createReviewSourceService(dependencies: {
   database: DatabaseService
+  resolver: NotionTargetResolver
   logger?: {
     info(msg: string): void
     error(msg: string): void
   }
 }): ReviewSourceService {
-  const { database, logger } = dependencies
+  const { database, resolver, logger } = dependencies
 
   /**
    * 입력 필드 스펙에 따른 공통 유효성 검증을 수행합니다.
@@ -174,19 +181,25 @@ export function createReviewSourceService(dependencies: {
       return database.reviewSources.findById(sourceId)
     },
 
-    createSource(input): ReviewSource {
+    async createSource(input): Promise<ReviewSource> {
       // 1. Target ID 정규화 및 중복 검사
-      const normalizedTargetId = normalizeNotionTargetId(input.notionTargetId || input.notionTargetUrl || '')
+      const normalizedTargetId = normalizeNotionTargetId(
+        input.notionTargetId || input.notionTargetUrl || ''
+      )
       if (!normalizedTargetId) {
         throw new Error('INVALID_TARGET')
       }
 
       // 동일 Notion Target ID 중복 등록 차단
       const allSources = database.reviewSources.findAll()
-      const isDuplicate = allSources.some(s => s.notionTargetId === normalizedTargetId)
+      const isDuplicate = allSources.some((s) => s.notionTargetId === normalizedTargetId)
       if (isDuplicate) {
         throw new Error('DUPLICATE_TARGET')
       }
+
+      // 실시간으로 Notion Target Resolver를 호출하여 실제 Target의 유효성과 타입을 검증합니다.
+      const resolveResult = await resolver.resolve(normalizedTargetId)
+      const resolvedType = resolveResult.targetType as NotionTargetType
 
       // 2. 유효성 검증
       validateSourceInput(input)
@@ -218,7 +231,7 @@ export function createReviewSourceService(dependencies: {
         name: input.name.trim(),
         notionTargetId: normalizedTargetId as NotionTargetId,
         notionTargetUrl: input.notionTargetUrl || null,
-        notionTargetType: input.notionTargetType || 'unknown',
+        notionTargetType: resolvedType,
         enabled: input.enabled ?? true,
         collectionMode: input.collectionMode,
         titlePropertyName: input.titlePropertyName.trim(),
@@ -237,7 +250,9 @@ export function createReviewSourceService(dependencies: {
       }
 
       database.reviewSources.save(newSource)
-      logger?.info(`새로운 Review Source가 생성되었습니다: ID: ${sourceId}, Target: ${normalizedTargetId}`)
+      logger?.info(
+        `새로운 Review Source가 생성되었습니다: ID: ${sourceId}, Target: ${normalizedTargetId}`
+      )
       return newSource
     },
 
@@ -299,9 +314,13 @@ export function createReviewSourceService(dependencies: {
       }
 
       // DB 커넥션을 직접 이용해 참조 개수를 계산합니다.
-      const items = database.connection.prepare(`
+      const items = database.connection
+        .prepare(
+          `
         SELECT id, source_ids_json FROM review_items
-      `).all() as { id: string; source_ids_json: string }[]
+      `
+        )
+        .all() as { id: string; source_ids_json: string }[]
 
       let soleCount = 0
       let sharedCount = 0
@@ -332,66 +351,109 @@ export function createReviewSourceService(dependencies: {
         throw new Error('INVALID_ITEM_POLICY')
       }
 
-      // SQLite 트랜잭션 외부에서 외래 키 체크를 꺼야 올바르게 비활성화됩니다.
-      database.connection.exec('PRAGMA foreign_keys = OFF')
+      const deleteTransaction = database.connection.transaction(() => {
+        // 1. review_logs 테이블의 source_id를 'system-deleted'로 일괄 변경하여 외래 키 제약 조건 준수
+        database.connection
+          .prepare(
+            `
+          UPDATE review_logs
+          SET source_id = 'system-deleted'
+          WHERE source_id = ?
+        `
+          )
+          .run(sourceId)
 
-      try {
-        const deleteTransaction = database.connection.transaction(() => {
-          // 1. 소스 삭제
-          database.connection.prepare('DELETE FROM review_sources WHERE id = ?').run(sourceId)
+        // 2. sync_events 테이블의 source_id를 'system-deleted'로 일괄 변경
+        database.connection
+          .prepare(
+            `
+          UPDATE sync_events
+          SET source_id = 'system-deleted'
+          WHERE source_id = ?
+        `
+          )
+          .run(sourceId)
 
-          // 2. 영향 받는 복습 항목들 처리
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const items = database.connection.prepare('SELECT * FROM review_items').all() as Record<string, any>[]
+        // 3. 영향 받는 복습 항목들 처리
+        interface ReviewItemRow {
+          id: string
+          primary_source_id: string
+          source_ids_json: string
+        }
+        const items = database.connection.prepare('SELECT * FROM review_items').all() as ReviewItemRow[]
 
-          for (const itemRow of items) {
-            const sourceIds = JSON.parse(itemRow.source_ids_json) as string[]
-            if (!sourceIds.includes(sourceId)) continue
+        for (const itemRow of items) {
+          const sourceIds = JSON.parse(itemRow.source_ids_json) as string[]
+          if (!sourceIds.includes(sourceId)) continue
 
-            const newSourceIds = sourceIds.filter(id => id !== sourceId)
+          const newSourceIds = sourceIds.filter((id) => id !== sourceId)
 
-            if (newSourceIds.length === 0) {
-              // 단독 참조 복습 항목인 경우 정책에 따름
-              if (itemPolicy === 'delete') {
-                // 물리 삭제 진행 (복습 로그는 절대 삭제하지 않음)
-                database.connection.prepare('DELETE FROM review_items WHERE id = ?').run(itemRow.id)
-              } else if (itemPolicy === 'archive') {
-                // 아카이브 처리
-                database.connection.prepare(`
-                  UPDATE review_items
-                  SET status = 'archived', source_ids_json = ?, updated_at = ?
-                  WHERE id = ?
-                `).run(JSON.stringify([]), new Date().toISOString(), itemRow.id)
-              } else if (itemPolicy === 'keep-history') {
-                // 상태 유지하며 삭제 처리 표시
-                database.connection.prepare(`
-                  UPDATE review_items
-                  SET status = 'deleted', source_ids_json = ?, updated_at = ?
-                  WHERE id = ?
-                `).run(JSON.stringify([]), new Date().toISOString(), itemRow.id)
-              }
-            } else {
-              // 여러 소스에서 공유 중인 복습 항목인 경우
-              let newPrimary = itemRow.primary_source_id
-              if (itemRow.primary_source_id === sourceId) {
-                // 기본 소스가 지워진 소스인 경우 남은 소스 중 첫 번째를 기본 소스로 지정
-                newPrimary = newSourceIds[0]
-              }
-
-              database.connection.prepare(`
+          if (newSourceIds.length === 0) {
+            // 단독 참조 복습 항목인 경우 정책에 따름
+            if (itemPolicy === 'delete') {
+              // 물리 삭제는 review_logs 테이블 등의 외래 키를 깨뜨리므로 'deleted' 상태로 soft-delete 처리하고 기본 소스를 안전망으로 이동
+              database.connection
+                .prepare(
+                  `
                 UPDATE review_items
-                SET primary_source_id = ?, source_ids_json = ?, updated_at = ?
+                SET status = 'deleted', primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?, deleted_detected_at = ?
                 WHERE id = ?
-              `).run(newPrimary, JSON.stringify(newSourceIds), new Date().toISOString(), itemRow.id)
+              `
+                )
+                .run(
+                  JSON.stringify([]),
+                  new Date().toISOString(),
+                  new Date().toISOString(),
+                  itemRow.id
+                )
+            } else if (itemPolicy === 'archive') {
+              // 아카이브 처리
+              database.connection
+                .prepare(
+                  `
+                UPDATE review_items
+                SET status = 'archived', primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?
+                WHERE id = ?
+              `
+                )
+                .run(JSON.stringify([]), new Date().toISOString(), itemRow.id)
+            } else if (itemPolicy === 'keep-history') {
+              // 상태 유지하며 basic metadata만 안전망으로 대피하여 히스토리 유지
+              database.connection
+                .prepare(
+                  `
+                UPDATE review_items
+                SET primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?
+                WHERE id = ?
+              `
+                )
+                .run(JSON.stringify([]), new Date().toISOString(), itemRow.id)
             }
-          }
-        })
+          } else {
+            // 여러 소스에서 공유 중인 복습 항목인 경우
+            let newPrimary = itemRow.primary_source_id
+            if (itemRow.primary_source_id === sourceId) {
+              // 기본 소스가 지워진 소스인 경우 남은 소스 중 첫 번째를 기본 소스로 지정
+              newPrimary = newSourceIds[0]
+            }
 
-        deleteTransaction()
-      } finally {
-        // 외래 키 체크 복구
-        database.connection.exec('PRAGMA foreign_keys = ON')
-      }
+            database.connection
+              .prepare(
+                `
+              UPDATE review_items
+              SET primary_source_id = ?, source_ids_json = ?, updated_at = ?
+              WHERE id = ?
+            `
+              )
+              .run(newPrimary, JSON.stringify(newSourceIds), new Date().toISOString(), itemRow.id)
+          }
+        }
+
+        // 4. 소스 삭제 (외래 키가 모두 정리되었으므로 문제없이 정상 동작함)
+        database.connection.prepare('DELETE FROM review_sources WHERE id = ?').run(sourceId)
+      })
+
+      deleteTransaction()
       logger?.info(`Review Source가 삭제되었습니다: ID: ${sourceId}, 정책: ${itemPolicy}`)
     },
 

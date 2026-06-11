@@ -89,14 +89,18 @@ describe('Source and Mapping IPC Boundary', () => {
       collectionMode: 'invalid_mode', // 허용 외
       titlePropertyName: 'Name'
     }
-    await expect(handlers['source:create'](event, badCreatePayload)).rejects.toThrow('INVALID_PAYLOAD')
+    await expect(handlers['source:create'](event, badCreatePayload)).rejects.toThrow(
+      'INVALID_PAYLOAD'
+    )
 
     // 허용하지 않는 삭제 정책
     const badDeletePayload = {
       sourceId: 'src_123',
       itemPolicy: 'invalid_policy' // 허용 외
     }
-    await expect(handlers['source:delete'](event, badDeletePayload)).rejects.toThrow('INVALID_PAYLOAD')
+    await expect(handlers['source:delete'](event, badDeletePayload)).rejects.toThrow(
+      'INVALID_PAYLOAD'
+    )
   })
 
   it('TC-SOURCE-IPC-004: 내부 예외 발생 시 스택 트레이스 및 민감한 디테일을 숨기고 사전에 정의된 정제된 stable error code를 반환합니다.', async () => {
@@ -105,7 +109,7 @@ describe('Source and Mapping IPC Boundary', () => {
     })
 
     const event = { senderFrame: { url: 'valid' } }
-    
+
     try {
       await handlers['source:list'](event)
       expect.fail('Should have thrown')

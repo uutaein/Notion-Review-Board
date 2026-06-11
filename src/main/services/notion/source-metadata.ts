@@ -57,7 +57,9 @@ export interface MappingPreviewResult {
  */
 export interface NotionTargetResolver {
   /** Notion 입력값(URL/ID)을 분석하여 고유 ID 및 타입(database, data_source)을 식별합니다. */
-  resolve(target: string): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }>
+  resolve(
+    target: string
+  ): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }>
 }
 
 /**
@@ -79,7 +81,9 @@ export interface NotionMetadataClient {
  * Notion 소스 메타데이터 관리 서비스 인터페이스입니다.
  */
 export interface NotionSourceMetadataService {
-  resolveTarget(params: { target: string }): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }>
+  resolveTarget(params: {
+    target: string
+  }): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }>
   listProperties(params: { target: string }): Promise<NotionPropertyInfo[]>
   validateMapping(params: {
     target: string
@@ -123,23 +127,40 @@ export function createNotionSourceMetadataService(dependencies: {
    * 에러 코드를 분석하여 stable한 도메인 보안 에러 메시지로 매핑하여 던집니다. (SEC-010)
    */
   function handleNotionError(err: any): never {
+    const message = err?.message || ''
     const status = err && typeof err === 'object' && 'status' in err ? err.status : undefined
-    logger?.error(`Notion 메타데이터 요청 중 에러 발생 (HTTP 상태: ${status}): ${err.message || err}`)
 
-    if (status === 401) {
+    if (
+      message === 'UNAUTHORIZED' ||
+      message === 'INVALID_TARGET' ||
+      message === 'FORBIDDEN' ||
+      message === 'NOT_FOUND' ||
+      message === 'RATE_LIMITED' ||
+      message === 'DUPLICATE_TARGET'
+    ) {
+      throw err
+    }
+
+    logger?.error(
+      `Notion 메타데이터 요청 중 에러 발생 (HTTP 상태: ${status}): ${err.message || err}`
+    )
+
+    if (status === 401 || message.includes('401')) {
       throw new Error('UNAUTHORIZED')
-    } else if (status === 403) {
+    } else if (status === 403 || message.includes('403')) {
       throw new Error('FORBIDDEN')
-    } else if (status === 404) {
+    } else if (status === 404 || message.includes('404')) {
       throw new Error('NOT_FOUND')
-    } else if (status === 429) {
+    } else if (status === 429 || message.includes('429')) {
       throw new Error('RATE_LIMITED')
     }
     throw new Error('NETWORK_ERROR')
   }
 
   return {
-    async resolveTarget({ target }): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }> {
+    async resolveTarget({
+      target
+    }): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }> {
       try {
         const targetId = normalizeNotionTargetId(target)
         if (!targetId) {
@@ -172,7 +193,7 @@ export function createNotionSourceMetadataService(dependencies: {
     async validateMapping(params): Promise<MappingValidationResult> {
       try {
         const properties = await this.listProperties({ target: params.target })
-        const propMap = new Map<string, string>(properties.map(p => [p.name, p.type]))
+        const propMap = new Map<string, string>(properties.map((p) => [p.name, p.type]))
         const errors: string[] = []
 
         // 1. 필수 속성 존재성 및 타입 체크
@@ -183,7 +204,9 @@ export function createNotionSourceMetadataService(dependencies: {
           if (!type) {
             errors.push(`Property '${params.titlePropertyName}' does not exist`)
           } else if (type !== 'title') {
-            errors.push(`Title property '${params.titlePropertyName}' must be of type 'title' (got '${type}')`)
+            errors.push(
+              `Title property '${params.titlePropertyName}' must be of type 'title' (got '${type}')`
+            )
           }
         }
 
@@ -193,7 +216,9 @@ export function createNotionSourceMetadataService(dependencies: {
           if (!type) {
             errors.push(`Property '${params.urlPropertyName}' does not exist`)
           } else if (type !== 'url') {
-            errors.push(`URL property '${params.urlPropertyName}' must be of type 'url' (got '${type}')`)
+            errors.push(
+              `URL property '${params.urlPropertyName}' must be of type 'url' (got '${type}')`
+            )
           }
         }
 
@@ -202,7 +227,9 @@ export function createNotionSourceMetadataService(dependencies: {
           if (!type) {
             errors.push(`Property '${params.categoryPropertyName}' does not exist`)
           } else if (!['select', 'status', 'relation', 'rich_text'].includes(type)) {
-            errors.push(`Category property '${params.categoryPropertyName}' type '${type}' is incompatible`)
+            errors.push(
+              `Category property '${params.categoryPropertyName}' type '${type}' is incompatible`
+            )
           }
         }
 
@@ -220,7 +247,9 @@ export function createNotionSourceMetadataService(dependencies: {
           if (!type) {
             errors.push(`Property '${params.reviewCheckboxPropertyName}' does not exist`)
           } else if (type !== 'checkbox') {
-            errors.push(`Review checkbox property '${params.reviewCheckboxPropertyName}' must be of type 'checkbox' (got '${type}')`)
+            errors.push(
+              `Review checkbox property '${params.reviewCheckboxPropertyName}' must be of type 'checkbox' (got '${type}')`
+            )
           }
         }
 
@@ -229,7 +258,9 @@ export function createNotionSourceMetadataService(dependencies: {
           if (!type) {
             errors.push(`Property '${params.lastEditedPropertyName}' does not exist`)
           } else if (!['last_edited_time', 'date'].includes(type)) {
-            errors.push(`Last edited property '${params.lastEditedPropertyName}' must be of type 'last_edited_time' or 'date'`)
+            errors.push(
+              `Last edited property '${params.lastEditedPropertyName}' must be of type 'last_edited_time' or 'date'`
+            )
           }
         }
 
@@ -248,7 +279,9 @@ export function createNotionSourceMetadataService(dependencies: {
                   errors.push(`Operator 'contains' is incompatible with property type '${type}'`)
                 }
               } else if (params.filterOperator === 'equals') {
-                if (!['select', 'status', 'relation', 'rich_text', 'title', 'checkbox'].includes(type)) {
+                if (
+                  !['select', 'status', 'relation', 'rich_text', 'title', 'checkbox'].includes(type)
+                ) {
                   errors.push(`Operator 'equals' is incompatible with property type '${type}'`)
                 }
               } else {
@@ -312,6 +345,8 @@ export function createNotionSourceMetadataService(dependencies: {
               return p.status?.name || null
             case 'multi_select':
               return p.multi_select?.map((s: any) => s.name) || []
+            case 'relation':
+              return p.relation?.map((r: any) => r.id) || []
             case 'checkbox':
               return p.checkbox ?? false
             case 'date':
@@ -335,7 +370,15 @@ export function createNotionSourceMetadataService(dependencies: {
         }
 
         // 3. 카테고리 파싱 (fallback: '미분류')
-        const parsedCategory = params.categoryPropertyName ? (getPropValue(params.categoryPropertyName) || '미분류') : '미분류'
+        let parsedCategory = '미분류'
+        if (params.categoryPropertyName) {
+          const val = getPropValue(params.categoryPropertyName)
+          if (Array.isArray(val)) {
+            parsedCategory = val[0] || '미분류'
+          } else if (typeof val === 'string') {
+            parsedCategory = val || '미분류'
+          }
+        }
 
         // 4. 태그 파싱 (fallback: ['미분류'])
         let parsedTags: string[] = []
@@ -352,13 +395,19 @@ export function createNotionSourceMetadataService(dependencies: {
         }
 
         // 5. 출처 라벨 파싱
-        const parsedOrigin = params.sourcePropertyName ? getPropValue(params.sourcePropertyName) : null
+        const parsedOrigin = params.sourcePropertyName
+          ? getPropValue(params.sourcePropertyName)
+          : null
 
         // 6. 체크박스 파싱
-        const parsedCheckbox = params.reviewCheckboxPropertyName ? !!getPropValue(params.reviewCheckboxPropertyName) : null
+        const parsedCheckbox = params.reviewCheckboxPropertyName
+          ? !!getPropValue(params.reviewCheckboxPropertyName)
+          : null
 
         // 7. 최근 수정 시각 (fallback: page.last_edited_time)
-        let parsedLastEdited = params.lastEditedPropertyName ? getPropValue(params.lastEditedPropertyName) : null
+        let parsedLastEdited = params.lastEditedPropertyName
+          ? getPropValue(params.lastEditedPropertyName)
+          : null
         if (!parsedLastEdited) {
           parsedLastEdited = samplePage.last_edited_time || null
         }
@@ -386,7 +435,9 @@ export function createNotionSourceMetadataService(dependencies: {
 export class ProductionNotionTargetResolver implements NotionTargetResolver {
   constructor(private readonly vault: TokenVault) {}
 
-  async resolve(target: string): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }> {
+  async resolve(
+    target: string
+  ): Promise<{ targetId: string; targetType: 'database' | 'data_source' | 'unknown' }> {
     const targetId = normalizeNotionTargetId(target)
     if (!targetId) {
       throw new Error('INVALID_TARGET')
@@ -397,8 +448,8 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
       throw new Error('UNAUTHORIZED')
     }
 
-    // 데이터베이스 존재 여부 및 권한 판정을 시도합니다.
-    const response = await fetch(`https://api.notion.com/v1/databases/${targetId}`, {
+    // 데이터 소스 존재 여부 및 권한 판정을 시도합니다.
+    const response = await fetch(`https://api.notion.com/v1/data_sources/${targetId}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -408,29 +459,14 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
     })
 
     if (response.ok) {
-      return { targetId, targetType: 'database' }
+      return { targetId, targetType: 'data_source' }
     }
 
     if (response.status === 404) {
-      // 데이터베이스가 없다면 페이지로 판단해 재조회를 수행합니다.
-      const pageResp = await fetch(`https://api.notion.com/v1/pages/${targetId}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Notion-Version': '2026-03-11'
-        },
-        signal: AbortSignal.timeout(10000)
-      })
-      if (pageResp.ok) {
-        return { targetId, targetType: 'data_source' }
-      }
-      if (pageResp.status === 404) {
-        throw { status: 404, message: 'Notion target not found' }
-      }
-      throw { status: pageResp.status, message: `Page API error ${pageResp.status}` }
+      throw { status: 404, message: 'Notion target not found' }
     }
 
-    throw { status: response.status, message: `Database API error ${response.status}` }
+    throw { status: response.status, message: `Data Source API error ${response.status}` }
   }
 }
 
@@ -446,7 +482,7 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
       throw new Error('UNAUTHORIZED')
     }
 
-    const response = await fetch(`https://api.notion.com/v1/databases/${targetId}`, {
+    const response = await fetch(`https://api.notion.com/v1/data_sources/${targetId}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -456,10 +492,15 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
     })
 
     if (!response.ok) {
-      throw { status: response.status, message: `Database schema fetch error ${response.status}` }
+      throw {
+        status: response.status,
+        message: `Data source schema fetch error ${response.status}`
+      }
     }
 
-    const data = await response.json() as { properties: Record<string, { id: string; type: string }> }
+    const data = (await response.json()) as {
+      properties: Record<string, { id: string; type: string }>
+    }
     const props = data.properties || {}
 
     return Object.entries(props).map(([name, val]) => ({
@@ -469,14 +510,21 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
     }))
   }
 
-  async fetchSamplePage(targetId: string): Promise<{ id: string; url: string; properties: Record<string, any>; last_edited_time: string } | null> {
+  async fetchSamplePage(
+    targetId: string
+  ): Promise<{
+    id: string
+    url: string
+    properties: Record<string, any>
+    last_edited_time: string
+  } | null> {
     const token = this.vault.getToken()
     if (!token) {
       throw new Error('UNAUTHORIZED')
     }
 
-    // 데이터베이스에 속한 가장 최근 페이지를 수집하기 위해 query database API를 1개 제한으로 호출합니다.
-    const response = await fetch(`https://api.notion.com/v1/databases/${targetId}/query`, {
+    // 데이터 소스에 속한 가장 최근 페이지를 수집하기 위해 query data source API를 1개 제한으로 호출합니다.
+    const response = await fetch(`https://api.notion.com/v1/data_sources/${targetId}/query`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -490,7 +538,7 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
     })
 
     if (response.ok) {
-      const data = await response.json() as { results: any[] }
+      const data = (await response.json()) as { results: any[] }
       const result = data.results?.[0]
       if (result) {
         return {
@@ -514,7 +562,7 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
     })
 
     if (pageResp.ok) {
-      const result = await pageResp.json() as any
+      const result = (await pageResp.json()) as any
       return {
         id: result.id,
         url: result.url,

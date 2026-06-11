@@ -16,8 +16,13 @@ export interface ReviewSourceAPI {
   getSource: (payload: { sourceId: string }) => Promise<any | null>
   createSource: (payload: any) => Promise<any>
   updateSource: (payload: any) => Promise<any>
-  getDeleteImpact: (payload: { sourceId: string }) => Promise<{ soleReferencedItemCount: number; sharedReferencedItemCount: number }>
-  deleteSource: (payload: { sourceId: string; itemPolicy: 'archive' | 'delete' | 'keep-history' }) => Promise<{ success: boolean }>
+  getDeleteImpact: (payload: {
+    sourceId: string
+  }) => Promise<{ soleReferencedItemCount: number; sharedReferencedItemCount: number }>
+  deleteSource: (payload: {
+    sourceId: string
+    itemPolicy: 'archive' | 'delete' | 'keep-history'
+  }) => Promise<{ success: boolean }>
   setEnabled: (payload: { sourceId: string; enabled: boolean }) => Promise<any>
 }
 

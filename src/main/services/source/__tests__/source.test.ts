@@ -10,15 +10,28 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { createDatabaseService, type DatabaseService } from '../../database'
 import { createReviewSourceService, normalizeNotionTargetId } from '../index'
 import type { ReviewSource, CollectionMode } from '../../../../shared/domain/source'
-import type { ReviewSourceId, NotionTargetId, DateTimeString } from '../../../../shared/domain/types'
+import type {
+  ReviewSourceId,
+  NotionTargetId,
+  DateTimeString
+} from '../../../../shared/domain/types'
 
 describe('Review Source Service', () => {
   let database: DatabaseService
   let service: any
+  let mockResolver: any
 
   beforeEach(() => {
     database = createDatabaseService(':memory:')
-    service = createReviewSourceService({ database })
+    mockResolver = {
+      resolve: async (target: string) => {
+        if (target.includes('invalid') || target.length !== 32) {
+          throw new Error('INVALID_TARGET')
+        }
+        return { targetId: target, targetType: 'data_source' as const }
+      }
+    }
+    service = createReviewSourceService({ database, resolver: mockResolver })
   })
 
   afterEach(() => {
@@ -39,8 +52,8 @@ describe('Review Source Service', () => {
   })
 
   describe('Source 생성 (createSource)', () => {
-    it('TC-SOURCE-001/002: 유효한 정보를 기입하면 자동으로 ID와 UTC 생성 시각이 부여된 소스가 생성됩니다.', () => {
-      const result = service.createSource({
+    it('TC-SOURCE-001/002: 유효한 정보를 기입하면 자동으로 ID와 UTC 생성 시각이 부여된 소스가 생성됩니다.', async () => {
+      const result = await service.createSource({
         name: '수학 복습',
         notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
         notionTargetType: 'database',
@@ -57,8 +70,8 @@ describe('Review Source Service', () => {
       expect(result.updatedAt).toBeDefined()
     })
 
-    it('TC-SOURCE-003: 이름이 누락되었거나 공백인 경우 생성이 거부됩니다.', () => {
-      expect(() => {
+    it('TC-SOURCE-003: 이름이 누락되었거나 공백인 경우 생성이 거부됩니다.', async () => {
+      await expect(
         service.createSource({
           name: '   ',
           notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
@@ -67,11 +80,11 @@ describe('Review Source Service', () => {
           collectionMode: 'all',
           titlePropertyName: 'Name'
         })
-      }).toThrow('INVALID_NAME')
+      ).rejects.toThrow('INVALID_NAME')
     })
 
-    it('TC-SOURCE-006: Title 매핑 프로퍼티가 누락되었을 경우 거부됩니다.', () => {
-      expect(() => {
+    it('TC-SOURCE-006: Title 매핑 프로퍼티가 누락되었을 경우 거부됩니다.', async () => {
+      await expect(
         service.createSource({
           name: '공부',
           notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
@@ -80,12 +93,12 @@ describe('Review Source Service', () => {
           collectionMode: 'all',
           titlePropertyName: '   '
         })
-      }).toThrow('INVALID_TITLE_MAPPING')
+      ).rejects.toThrow('INVALID_TITLE_MAPPING')
     })
 
-    it('TC-SOURCE-007: tag 모드인 경우 filter 속성과 연산자 및 값 유효성 체크를 진행합니다.', () => {
+    it('TC-SOURCE-007: tag 모드인 경우 filter 속성과 연산자 및 값 유효성 체크를 진행합니다.', async () => {
       // 필터 속성 누락 시 거부
-      expect(() => {
+      await expect(
         service.createSource({
           name: '공부',
           notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
@@ -95,10 +108,10 @@ describe('Review Source Service', () => {
           titlePropertyName: 'Name',
           filterPropertyName: ''
         })
-      }).toThrow('INVALID_TAG_FILTER')
+      ).rejects.toThrow('INVALID_TAG_FILTER')
 
       // 연산자 불일치 시 거부
-      expect(() => {
+      await expect(
         service.createSource({
           name: '공부',
           notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
@@ -110,11 +123,11 @@ describe('Review Source Service', () => {
           filterOperator: 'checked' as any,
           filterValue: 'Done'
         })
-      }).toThrow('INVALID_TAG_FILTER')
+      ).rejects.toThrow('INVALID_TAG_FILTER')
     })
 
-    it('TC-SOURCE-008: checkbox 모드인 경우 checkbox property mapping이 누락되면 거부됩니다.', () => {
-      expect(() => {
+    it('TC-SOURCE-008: checkbox 모드인 경우 checkbox property mapping이 누락되면 거부됩니다.', async () => {
+      await expect(
         service.createSource({
           name: '공부',
           notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
@@ -124,11 +137,11 @@ describe('Review Source Service', () => {
           titlePropertyName: 'Name',
           reviewCheckboxPropertyName: ''
         })
-      }).toThrow('INVALID_CHECKBOX_MAPPING')
+      ).rejects.toThrow('INVALID_CHECKBOX_MAPPING')
     })
 
-    it('TC-SOURCE-009: all 모드 시 불필요한 태그 및 체크박스 필터 설정값들은 안전하게 무시/정리됩니다.', () => {
-      const result = service.createSource({
+    it('TC-SOURCE-009: all 모드 시 불필요한 태그 및 체크박스 필터 설정값들은 안전하게 무시/정리됩니다.', async () => {
+      const result = await service.createSource({
         name: '전체 수집공부',
         notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
         notionTargetType: 'database',
@@ -147,8 +160,8 @@ describe('Review Source Service', () => {
       expect(result.reviewCheckboxPropertyName).toBeNull()
     })
 
-    it('TC-SOURCE-011: 중복된 Notion Target ID를 가진 소스가 이미 존재한다면 생성이 차단됩니다.', () => {
-      service.createSource({
+    it('TC-SOURCE-011: 중복된 Notion Target ID를 가진 소스가 이미 존재한다면 생성이 차단됩니다.', async () => {
+      await service.createSource({
         name: '첫번째 소스',
         notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
         notionTargetType: 'database',
@@ -157,7 +170,7 @@ describe('Review Source Service', () => {
         titlePropertyName: 'Name'
       })
 
-      expect(() => {
+      await expect(
         service.createSource({
           name: '두번째 소스(중복 target)',
           notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
@@ -166,15 +179,15 @@ describe('Review Source Service', () => {
           collectionMode: 'all',
           titlePropertyName: 'Name'
         })
-      }).toThrow('DUPLICATE_TARGET')
+      ).rejects.toThrow('DUPLICATE_TARGET')
     })
   })
 
   describe('Source 수정 (updateSource)', () => {
     let createdId: string
 
-    beforeEach(() => {
-      const source = service.createSource({
+    beforeEach(async () => {
+      const source = await service.createSource({
         name: '원본 소스',
         notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
         notionTargetType: 'database',
@@ -200,7 +213,9 @@ describe('Review Source Service', () => {
       expect(updated.enabled).toBe(false)
       expect(updated.createdAt).toBe(original.createdAt)
       expect(updated.notionTargetId).toBe(original.notionTargetId)
-      expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(original.updatedAt).getTime())
+      expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(original.updatedAt).getTime()
+      )
     })
 
     it('TC-SOURCE-015: 소스 수정을 통한 모드 변경 시 해당 모드의 필수 필터 설정들이 재검증 및 정형화됩니다.', () => {
@@ -234,9 +249,9 @@ describe('Review Source Service', () => {
     let sourceIdA: string
     let sourceIdB: string
 
-    beforeEach(() => {
+    beforeEach(async () => {
       // 2개의 소스 등록
-      const srcA = service.createSource({
+      const srcA = await service.createSource({
         name: '소스 A',
         notionTargetId: 'a8aec8ae9b7e411cb3a8e9e1c1234561',
         notionTargetType: 'database',
@@ -246,7 +261,7 @@ describe('Review Source Service', () => {
       })
       sourceIdA = srcA.id
 
-      const srcB = service.createSource({
+      const srcB = await service.createSource({
         name: '소스 B',
         notionTargetId: 'a8aec8ae9b7e411cb3a8e9e1c1234562',
         notionTargetType: 'database',
@@ -340,43 +355,48 @@ describe('Review Source Service', () => {
       expect(sharedItem?.primarySourceId).toBe(sourceIdB) // B가 새로운 기본 소스가 됨
     })
 
-    it('TC-SOURCE-022 (delete 정책): 단독 참조 복습 항목이 물리적으로 DB에서 삭제 처리됩니다.', () => {
+    it('TC-SOURCE-022 (delete 정책): 단독 참조 복습 항목이 물리적으로 삭제되지 않고 status가 deleted로 soft-delete 처리됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'delete' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
-      expect(soleItem).toBeNull() // 물리 삭제 성공
+      expect(soleItem).toBeDefined()
+      expect(soleItem?.status).toBe('deleted')
+      expect(soleItem?.primarySourceId).toBe('system-deleted')
     })
 
-    it('TC-SOURCE-022 (archive 정책): 단독 참조 복습 항목이 archived 상태로 변경됩니다.', () => {
+    it('TC-SOURCE-022 (archive 정책): 단독 참조 복습 항목이 archived 상태로 변경되고 primarySourceId가 system-deleted가 됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'archive' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
       expect(soleItem?.status).toBe('archived')
+      expect(soleItem?.primarySourceId).toBe('system-deleted')
     })
 
-    it('TC-SOURCE-022 (keep-history 정책): 단독 참조 복습 항목의 히스토리를 살리기 위해 deleted 상태로 표시됩니다.', () => {
+    it('TC-SOURCE-022 (keep-history 정책): 단독 참조 복습 항목의 히스토리가 유지되며 primarySourceId가 system-deleted로 대피됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'keep-history' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
-      expect(soleItem?.status).toBe('deleted')
+      expect(soleItem?.status).toBe('active') // 원래 active 유지
+      expect(soleItem?.primarySourceId).toBe('system-deleted')
     })
 
-    it('TC-SOURCE-023: 어떤 소스 삭제 처리 하에서도 기존 복습 로그(Review Log)는 절대 훼손 또는 삭제되지 않습니다.', () => {
+    it('TC-SOURCE-023: 어떤 소스 삭제 처리 하에서도 기존 복습 로그(Review Log)는 절대 훼손 또는 삭제되지 않으며, sourceId가 system-deleted로 변경됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'delete' })
 
       const logs = database.reviewLogs.findByItemId('item-sole-a' as any)
       expect(logs.length).toBe(1) // 로그는 안전하게 보존됨
       expect(logs[0].id).toBe('log-sole-a')
+      expect(logs[0].sourceId).toBe('system-deleted')
     })
   })
 
   describe('Source 활성화 정책 (setSourceEnabled)', () => {
     let sourceId: string
 
-    beforeEach(() => {
-      const source = service.createSource({
+    beforeEach(async () => {
+      const source = await service.createSource({
         name: '활성 소스',
         notionTargetId: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
         notionTargetType: 'database',

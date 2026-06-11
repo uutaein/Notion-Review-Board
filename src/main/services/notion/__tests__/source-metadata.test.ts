@@ -25,10 +25,10 @@ describe('Notion Source Metadata Service', () => {
     // 2. NotionTargetResolver 모킹
     mockResolver = {
       resolve: vi.fn().mockImplementation(async (target: string) => {
-        if (target.includes('invalid')) {
+        if (target.includes('ffffffffffffffffffffffffffffffff')) {
           throw { status: 404, message: 'Not found' }
         }
-        return { targetId: 'resolved-target-32', targetType: 'database' }
+        return { targetId: 'resolved-target-32', targetType: 'data_source' }
       })
     }
 
@@ -44,7 +44,7 @@ describe('Notion Source Metadata Service', () => {
         if (targetId.includes('429')) {
           throw { status: 429, message: 'Rate limited' }
         }
-        if (targetId.includes('network')) {
+        if (targetId.includes('bee')) {
           throw new Error('Socket timeout')
         }
 
@@ -61,7 +61,7 @@ describe('Notion Source Metadata Service', () => {
       }),
 
       fetchSamplePage: vi.fn().mockImplementation(async (targetId: string) => {
-        if (targetId.includes('nosample')) {
+        if (targetId.includes('bad')) {
           return null // 데이터베이스에 아무 페이지도 없는 경우
         }
 
@@ -93,25 +93,33 @@ describe('Notion Source Metadata Service', () => {
     it('TC-MAPPING-006: Notion 토큰 검증 단계가 포함되며, 식별이 성공하면 정상적인 ID와 타입을 제공합니다.', async () => {
       const result = await service.resolveTarget({ target: 'a8aec8ae9b7e411cb3a8e9e1c1234567' })
       expect(result.targetId).toBe('resolved-target-32')
-      expect(result.targetType).toBe('database')
+      expect(result.targetType).toBe('data_source')
     })
   })
 
   describe('에러 마스킹 규칙 (TC-MAPPING-007 / SEC-010)', () => {
     it('Notion API 401 에러는 UNAUTHORIZED 에러로 가공됩니다.', async () => {
-      await expect(service.listProperties({ target: 'error-401' })).rejects.toThrow('UNAUTHORIZED')
+      await expect(
+        service.listProperties({ target: '00000000000000000000000000000401' })
+      ).rejects.toThrow('UNAUTHORIZED')
     })
 
     it('Notion API 403 에러는 FORBIDDEN 에러로 가공됩니다.', async () => {
-      await expect(service.listProperties({ target: 'error-403' })).rejects.toThrow('FORBIDDEN')
+      await expect(
+        service.listProperties({ target: '00000000000000000000000000000403' })
+      ).rejects.toThrow('FORBIDDEN')
     })
 
     it('Notion API 429 에러는 RATE_LIMITED 에러로 가공됩니다.', async () => {
-      await expect(service.listProperties({ target: 'error-429' })).rejects.toThrow('RATE_LIMITED')
+      await expect(
+        service.listProperties({ target: '00000000000000000000000000000429' })
+      ).rejects.toThrow('RATE_LIMITED')
     })
 
     it('네트워크 시간초과 및 일반 소켓 에러는 NETWORK_ERROR 에러로 가공됩니다.', async () => {
-      await expect(service.listProperties({ target: 'error-network' })).rejects.toThrow('NETWORK_ERROR')
+      await expect(
+        service.listProperties({ target: '00000000000000000000000000000bee' })
+      ).rejects.toThrow('NETWORK_ERROR')
     })
   })
 
@@ -135,7 +143,7 @@ describe('Notion Source Metadata Service', () => {
       })
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e: string) => e.includes('must be of type \'title\''))).toBe(true)
+      expect(result.errors.some((e: string) => e.includes("must be of type 'title'"))).toBe(true)
     })
 
     it('TC-MAPPING-010: URL 매핑 프로퍼티 타입이 url이 아닌 경우 거부합니다.', async () => {
@@ -147,7 +155,7 @@ describe('Notion Source Metadata Service', () => {
       })
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e: string) => e.includes('must be of type \'url\''))).toBe(true)
+      expect(result.errors.some((e: string) => e.includes("must be of type 'url'"))).toBe(true)
     })
 
     it('TC-MAPPING-011: Checkbox 수집 모드 지정 시 매핑 체크박스가 checkbox 타입이 아닐 경우 거부합니다.', async () => {
@@ -159,7 +167,7 @@ describe('Notion Source Metadata Service', () => {
       })
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e: string) => e.includes('must be of type \'checkbox\''))).toBe(true)
+      expect(result.errors.some((e: string) => e.includes("must be of type 'checkbox'"))).toBe(true)
     })
 
     it('TC-MAPPING-012: tag 수집 모드의 필터 연산자가 속성 타입과 일치하지 않는 경우 거부합니다.', async () => {
@@ -172,7 +180,9 @@ describe('Notion Source Metadata Service', () => {
       })
 
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e: string) => e.includes('Operator \'contains\' is incompatible'))).toBe(true)
+      expect(
+        result.errors.some((e: string) => e.includes("Operator 'contains' is incompatible"))
+      ).toBe(true)
     })
   })
 
@@ -199,7 +209,7 @@ describe('Notion Source Metadata Service', () => {
 
     it('TC-MAPPING-014: 대상 데이터베이스가 비어있을 경우 sample 없음 상태를 올바르게 명시합니다.', async () => {
       const result = await service.previewMapping({
-        target: 'no-sample-database',
+        target: '00000000000000000000000000000bad',
         titlePropertyName: 'Name'
       })
 
@@ -220,7 +230,7 @@ describe('Notion Source Metadata Service', () => {
       expect(result.url).toBe('https://notion.so/page-123-canonical-url')
     })
 
-    it('TC-MAPPING-003: 분류 및 태그 매핑 누락 시 각각 문자열 및 리스트 형태의 \'미분류\' 로 강제 대체합니다.', async () => {
+    it("TC-MAPPING-003: 분류 및 태그 매핑 누락 시 각각 문자열 및 리스트 형태의 '미분류' 로 강제 대체합니다.", async () => {
       const result = await service.previewMapping({
         target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
         titlePropertyName: 'Name',

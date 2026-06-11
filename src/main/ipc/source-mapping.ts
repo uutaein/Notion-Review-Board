@@ -39,7 +39,12 @@ function sanitizeIpcError(err: unknown): Error {
     'NOT_FOUND',
     'RATE_LIMITED',
     'NETWORK_ERROR',
-    'INVALID_ITEM_POLICY'
+    'INVALID_ITEM_POLICY',
+    'INVALID_NAME',
+    'INVALID_TITLE_MAPPING',
+    'INVALID_TAG_FILTER',
+    'INVALID_CHECKBOX_MAPPING',
+    'INVALID_TARGET'
   ]
 
   const originalMessage = err instanceof Error ? err.message : ''
@@ -89,6 +94,35 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
     }
   }
 
+  /**
+   * 문자열 필드를 검증합니다. optional이 true일 경우 null 또는 undefined를 허용합니다.
+   */
+  function validateStringField(value: unknown, maxLength: number, optional = false): void {
+    if (value === undefined || value === null) {
+      if (optional) return
+      throw new Error('INVALID_PAYLOAD')
+    }
+    if (typeof value !== 'string') {
+      throw new Error('INVALID_PAYLOAD')
+    }
+    if (value.length > maxLength) {
+      throw new Error('INVALID_PAYLOAD')
+    }
+  }
+
+  /**
+   * enum 형식의 필드를 검증합니다.
+   */
+  function validateEnumField<T>(value: unknown, allowedValues: T[], optional = false): void {
+    if (value === undefined || value === null) {
+      if (optional) return
+      throw new Error('INVALID_PAYLOAD')
+    }
+    if (!allowedValues.includes(value as T)) {
+      throw new Error('INVALID_PAYLOAD')
+    }
+  }
+
   // 1. 등록된 모든 복습 소스 목록 조회
   ipcMain.handle(
     'source:list',
@@ -109,9 +143,7 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       }
       const payload = args[0] as any
       validatePayloadKeys(payload, ['sourceId'])
-      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.sourceId, 64, false)
       return sourceService.getSource({ sourceId: payload.sourceId })
     })
   )
@@ -119,7 +151,7 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
   // 3. 신규 복습 소스 생성
   ipcMain.handle(
     'source:create',
-    secureHandle((_event, ...args) => {
+    secureHandle(async (_event, ...args) => {
       if (args.length !== 1) {
         throw new Error('INVALID_PAYLOAD')
       }
@@ -143,27 +175,29 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
         'filterValue'
       ])
 
-      // 페이로드 형식 검사
-      if (typeof payload.name !== 'string' || payload.name.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (typeof payload.notionTargetId !== 'string' || payload.notionTargetId.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (payload.notionTargetUrl !== undefined && payload.notionTargetUrl !== null && typeof payload.notionTargetUrl !== 'string') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.name, 256, false)
+      validateStringField(payload.notionTargetId, 256, false)
+      validateStringField(payload.notionTargetUrl, 2048, true)
+
       if (typeof payload.enabled !== 'boolean') {
         throw new Error('INVALID_PAYLOAD')
       }
-      if (!['tag', 'checkbox', 'all'].includes(payload.collectionMode)) {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
 
-      return sourceService.createSource(payload)
+      validateEnumField(payload.collectionMode, ['tag', 'checkbox', 'all'], false)
+      validateEnumField(payload.notionTargetType, ['database', 'data_source', 'unknown'], false)
+
+      validateStringField(payload.titlePropertyName, 256, false)
+      validateStringField(payload.urlPropertyName, 256, true)
+      validateStringField(payload.categoryPropertyName, 256, true)
+      validateStringField(payload.tagPropertyName, 256, true)
+      validateStringField(payload.sourcePropertyName, 256, true)
+      validateStringField(payload.reviewCheckboxPropertyName, 256, true)
+      validateStringField(payload.lastEditedPropertyName, 256, true)
+      validateStringField(payload.filterPropertyName, 256, true)
+      validateEnumField(payload.filterOperator, ['equals', 'contains', 'checked'], true)
+      validateStringField(payload.filterValue, 256, true)
+
+      return await sourceService.createSource(payload)
     })
   )
 
@@ -192,21 +226,25 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
         'filterValue'
       ])
 
-      if (typeof payload.id !== 'string' || payload.id.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (typeof payload.name !== 'string' || payload.name.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.id, 64, false)
+      validateStringField(payload.name, 256, false)
+
       if (typeof payload.enabled !== 'boolean') {
         throw new Error('INVALID_PAYLOAD')
       }
-      if (!['tag', 'checkbox', 'all'].includes(payload.collectionMode)) {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+
+      validateEnumField(payload.collectionMode, ['tag', 'checkbox', 'all'], false)
+
+      validateStringField(payload.titlePropertyName, 256, false)
+      validateStringField(payload.urlPropertyName, 256, true)
+      validateStringField(payload.categoryPropertyName, 256, true)
+      validateStringField(payload.tagPropertyName, 256, true)
+      validateStringField(payload.sourcePropertyName, 256, true)
+      validateStringField(payload.reviewCheckboxPropertyName, 256, true)
+      validateStringField(payload.lastEditedPropertyName, 256, true)
+      validateStringField(payload.filterPropertyName, 256, true)
+      validateEnumField(payload.filterOperator, ['equals', 'contains', 'checked'], true)
+      validateStringField(payload.filterValue, 256, true)
 
       return sourceService.updateSource(payload)
     })
@@ -221,9 +259,7 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       }
       const payload = args[0] as any
       validatePayloadKeys(payload, ['sourceId'])
-      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.sourceId, 64, false)
       return sourceService.getDeleteImpact({ sourceId: payload.sourceId })
     })
   )
@@ -237,12 +273,9 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       }
       const payload = args[0] as any
       validatePayloadKeys(payload, ['sourceId', 'itemPolicy'])
-      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (!['archive', 'delete', 'keep-history'].includes(payload.itemPolicy)) {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.sourceId, 64, false)
+      validateEnumField(payload.itemPolicy, ['archive', 'delete', 'keep-history'], false)
+
       sourceService.deleteSource({
         sourceId: payload.sourceId,
         itemPolicy: payload.itemPolicy
@@ -260,9 +293,7 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       }
       const payload = args[0] as any
       validatePayloadKeys(payload, ['sourceId', 'enabled'])
-      if (typeof payload.sourceId !== 'string' || payload.sourceId.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.sourceId, 64, false)
       if (typeof payload.enabled !== 'boolean') {
         throw new Error('INVALID_PAYLOAD')
       }
@@ -282,9 +313,7 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       }
       const payload = args[0] as any
       validatePayloadKeys(payload, ['target'])
-      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.target, 2048, false)
       return await metadataService.resolveTarget({ target: payload.target })
     })
   )
@@ -298,9 +327,7 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       }
       const payload = args[0] as any
       validatePayloadKeys(payload, ['target'])
-      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.target, 2048, false)
       return await metadataService.listProperties({ target: payload.target })
     })
   )
@@ -327,15 +354,17 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
         'filterOperator'
       ])
 
-      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (!['tag', 'checkbox', 'all'].includes(payload.collectionMode)) {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.target, 2048, false)
+      validateEnumField(payload.collectionMode, ['tag', 'checkbox', 'all'], false)
+      validateStringField(payload.titlePropertyName, 256, false)
+      validateStringField(payload.urlPropertyName, 256, true)
+      validateStringField(payload.categoryPropertyName, 256, true)
+      validateStringField(payload.tagPropertyName, 256, true)
+      validateStringField(payload.sourcePropertyName, 256, true)
+      validateStringField(payload.reviewCheckboxPropertyName, 256, true)
+      validateStringField(payload.lastEditedPropertyName, 256, true)
+      validateStringField(payload.filterPropertyName, 256, true)
+      validateEnumField(payload.filterOperator, ['equals', 'contains', 'checked'], true)
 
       return await metadataService.validateMapping(payload)
     })
@@ -360,12 +389,14 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
         'lastEditedPropertyName'
       ])
 
-      if (typeof payload.target !== 'string' || payload.target.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
-      if (typeof payload.titlePropertyName !== 'string' || payload.titlePropertyName.trim() === '') {
-        throw new Error('INVALID_PAYLOAD')
-      }
+      validateStringField(payload.target, 2048, false)
+      validateStringField(payload.titlePropertyName, 256, false)
+      validateStringField(payload.urlPropertyName, 256, true)
+      validateStringField(payload.categoryPropertyName, 256, true)
+      validateStringField(payload.tagPropertyName, 256, true)
+      validateStringField(payload.sourcePropertyName, 256, true)
+      validateStringField(payload.reviewCheckboxPropertyName, 256, true)
+      validateStringField(payload.lastEditedPropertyName, 256, true)
 
       return await metadataService.previewMapping(payload)
     })

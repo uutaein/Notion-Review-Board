@@ -141,8 +141,11 @@ app.whenReady().then(() => {
   })
 
   // Review Source 및 Notion 메타데이터 서비스 초기화
-  const sourceService = createReviewSourceService({ database: database! })
   const metadataResolver = new ProductionNotionTargetResolver(vault)
+  const sourceService = createReviewSourceService({
+    database: database!,
+    resolver: metadataResolver
+  })
   const metadataClient = new ProductionNotionMetadataClient(vault)
   const metadataService = createNotionSourceMetadataService({
     resolver: metadataResolver,
