@@ -197,6 +197,123 @@ describe('Review Source Service', () => {
       expect(second.id).toBeDefined()
       expect(second.id).not.toBe(first.id)
     })
+
+    it('Notion Target Resolver에서 401 에러를 발생시키는 경우 UNAUTHORIZED 에러로 매핑하여 차단합니다.', async () => {
+      mockResolver.resolve = async () => {
+        const err = new Error('Data Source API error 401') as any
+        err.status = 401
+        throw err
+      }
+
+      await expect(
+        service.createSource({
+          name: '소스',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+          enabled: true,
+          collectionMode: 'all',
+          titlePropertyName: 'Name'
+        })
+      ).rejects.toThrow('UNAUTHORIZED')
+    })
+
+    it('Notion Target Resolver에서 403 에러를 발생시키는 경우 FORBIDDEN 에러로 매핑하여 차단합니다.', async () => {
+      mockResolver.resolve = async () => {
+        const err = new Error('Database API error 403') as any
+        err.status = 403
+        throw err
+      }
+
+      await expect(
+        service.createSource({
+          name: '소스',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+          enabled: true,
+          collectionMode: 'all',
+          titlePropertyName: 'Name'
+        })
+      ).rejects.toThrow('FORBIDDEN')
+    })
+
+    it('Notion Target Resolver에서 404 에러를 발생시키는 경우 NOT_FOUND 에러로 매핑하여 차단합니다.', async () => {
+      mockResolver.resolve = async () => {
+        const err = new Error('Notion target not found') as any
+        err.status = 404
+        throw err
+      }
+
+      await expect(
+        service.createSource({
+          name: '소스',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+          enabled: true,
+          collectionMode: 'all',
+          titlePropertyName: 'Name'
+        })
+      ).rejects.toThrow('NOT_FOUND')
+    })
+
+    it('Notion Target Resolver에서 429 에러를 발생시키는 경우 RATE_LIMITED 에러로 매핑하여 차단합니다.', async () => {
+      mockResolver.resolve = async () => {
+        const err = new Error('Rate limit exceeded') as any
+        err.status = 429
+        throw err
+      }
+
+      await expect(
+        service.createSource({
+          name: '소스',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+          enabled: true,
+          collectionMode: 'all',
+          titlePropertyName: 'Name'
+        })
+      ).rejects.toThrow('RATE_LIMITED')
+    })
+
+    it('Notion Target Resolver에서 일반 네트워크 에러를 발생시키는 경우 NETWORK_ERROR 에러로 매핑하여 차단합니다.', async () => {
+      mockResolver.resolve = async () => {
+        throw new Error('Connection timeout')
+      }
+
+      await expect(
+        service.createSource({
+          name: '소스',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+          enabled: true,
+          collectionMode: 'all',
+          titlePropertyName: 'Name'
+        })
+      ).rejects.toThrow('NETWORK_ERROR')
+    })
+
+    it('SQLite 고유 제약조건 위반(UNIQUE constraint failed) 발생 시 DUPLICATE_TARGET 에러로 변환합니다.', async () => {
+      // 첫 번째 소스 생성
+      await service.createSource({
+        name: '첫번째 소스',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+        enabled: true,
+        collectionMode: 'all',
+        titlePropertyName: 'Name'
+      })
+
+      // 두 번째 생성 시, 중복 체크를 우회하도록 mock 처리
+      const originalFindAll = database.reviewSources.findAll
+      database.reviewSources.findAll = () => []
+
+      try {
+        await expect(
+          service.createSource({
+            name: '두번째 소스',
+            target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+            enabled: true,
+            collectionMode: 'all',
+            titlePropertyName: 'Name'
+          })
+        ).rejects.toThrow('DUPLICATE_TARGET')
+      } finally {
+        database.reviewSources.findAll = originalFindAll
+      }
+    })
   })
 
   describe('Source 수정 (updateSource)', () => {

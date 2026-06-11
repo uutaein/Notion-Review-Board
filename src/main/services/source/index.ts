@@ -179,6 +179,37 @@ export function createReviewSourceService(dependencies: {
     }
   }
 
+  /**
+   * Notion Target Resolver 호출 오류를 안정적인 도메인 오류 코드로 매핑합니다.
+   */
+  function handleResolverError(err: any): never {
+    const message = err?.message || ''
+    const status = err && typeof err === 'object' && 'status' in err ? err.status : undefined
+
+    if (
+      message === 'UNAUTHORIZED' ||
+      message === 'INVALID_TARGET' ||
+      message === 'FORBIDDEN' ||
+      message === 'NOT_FOUND' ||
+      message === 'RATE_LIMITED' ||
+      message === 'DUPLICATE_TARGET' ||
+      message === 'MULTIPLE_DATA_SOURCES_FOUND'
+    ) {
+      throw err
+    }
+
+    if (status === 401 || message.includes('401')) {
+      throw new Error('UNAUTHORIZED')
+    } else if (status === 403 || message.includes('403')) {
+      throw new Error('FORBIDDEN')
+    } else if (status === 404 || message.includes('404')) {
+      throw new Error('NOT_FOUND')
+    } else if (status === 429 || message.includes('429')) {
+      throw new Error('RATE_LIMITED')
+    }
+    throw new Error('NETWORK_ERROR')
+  }
+
   return {
     listSources(): ReviewSource[] {
       return database.reviewSources.findAll().filter((s) => s.id !== 'system-deleted')
@@ -197,7 +228,12 @@ export function createReviewSourceService(dependencies: {
       }
 
       // 실시간으로 Notion Target Resolver를 호출하여 실제 Target의 유효성과 타입을 검증합니다.
-      const resolveResult = await resolver.resolve(normalizedTargetId)
+      let resolveResult
+      try {
+        resolveResult = await resolver.resolve(normalizedTargetId)
+      } catch (err) {
+        handleResolverError(err)
+      }
       const resolvedType = resolveResult.targetType as NotionTargetType
 
       // 동일 Notion Target ID 중복 등록 차단 (해석된 실제 ID 기준)
@@ -256,7 +292,15 @@ export function createReviewSourceService(dependencies: {
         deletedAt: null
       }
 
-      database.reviewSources.insert(newSource)
+      try {
+        database.reviewSources.insert(newSource)
+      } catch (err: any) {
+        if (err && (err.code === 'SQLITE_CONSTRAINT' || String(err.message).includes('UNIQUE constraint failed'))) {
+          throw new Error('DUPLICATE_TARGET')
+        }
+        throw err
+      }
+
       logger?.info(
         `새로운 Review Source가 생성되었습니다: ID: ${sourceId}, Target: ${normalizedTargetId}`
       )
