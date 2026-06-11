@@ -2,6 +2,14 @@ import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { createDatabaseService, type DatabaseService } from './services/database'
+import {
+  createNotionConnectionService,
+  TokenVault,
+  FileBlobStore,
+  ElectronEncryptionBackend,
+  ProductionNotionConnectionClient
+} from './services/notion/connection'
+import { registerNotionConnectionIpc } from './ipc/notion-connection'
 
 let database: DatabaseService | null = null
 
@@ -51,6 +59,35 @@ app.whenReady().then(() => {
       throw new Error('Only HTTPS URLs are allowed')
     }
     return shell.openExternal(url)
+  })
+
+  // Notion 연결성 검증 및 토큰 보안 설정 서비스 초기화
+  const encryption = new ElectronEncryptionBackend()
+  const store = new FileBlobStore(join(app.getPath('userData'), 'notion-token.dat'))
+  const vault = new TokenVault(encryption, store)
+  const client = new ProductionNotionConnectionClient()
+  const notionConnectionService = createNotionConnectionService({ vault, client })
+
+  // 안전한 IPC 송신처 검증 함수 정의
+  const isValidSender = (event: unknown): boolean => {
+    const ev = event as { senderFrame?: { url: string } }
+    const senderFrame = ev.senderFrame
+    if (!senderFrame) return false
+    if (
+      senderFrame.url.startsWith('file://') ||
+      (process.env.ELECTRON_RENDERER_URL &&
+        senderFrame.url.startsWith(process.env.ELECTRON_RENDERER_URL))
+    ) {
+      return true
+    }
+    return false
+  }
+
+  // Notion 연결 관련 IPC 채널 활성화 등록
+  registerNotionConnectionIpc({
+    service: notionConnectionService,
+    ipcMain,
+    isValidSender
   })
 
   createWindow()
