@@ -54,7 +54,7 @@ export interface FsrsEngine {
 export function createFsrsEngine(): FsrsEngine {
   /** 현재 어댑터 계산 방식과 호환성을 가지는 구체적 버전 문자열 정보 */
   const version = 'ts-fsrs@5'
-  
+
   /** 실제 계산 연산을 위임하여 수행시킬 코어 라이브러리 싱글톤 인스턴스 */
   const f = fsrs()
 
@@ -62,7 +62,7 @@ export function createFsrsEngine(): FsrsEngine {
     createInitialState(reviewedAt: DateTimeString): FsrsState {
       // 지정된 첫 복습 완료 시간 정보를 바탕으로 ts-fsrs 라이브러리의 기본 카드 구조를 생성합니다.
       const card = createEmptyCard(new Date(reviewedAt))
-      
+
       // JSON 호환성 및 영속화를 보장하기 위해 라이브러리 전용 Date 타입을 ISO 8601 UTC 문자열로 변환 직렬화합니다.
       return {
         version,
@@ -100,7 +100,9 @@ export function createFsrsEngine(): FsrsEngine {
         reps: stateCopy.payload.reps as number,
         lapses: stateCopy.payload.lapses as number,
         state: stateCopy.payload.state as number,
-        last_review: stateCopy.payload.last_review ? new Date(stateCopy.payload.last_review as string) : undefined,
+        last_review: stateCopy.payload.last_review
+          ? new Date(stateCopy.payload.last_review as string)
+          : undefined,
         learning_steps: (stateCopy.payload.learning_steps as number) ?? 0
       }
 

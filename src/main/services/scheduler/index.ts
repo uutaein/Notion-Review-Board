@@ -28,11 +28,10 @@ export interface SchedulingEngine {
    * @param input - FSRS 스케줄 계산에 필요한 인풋 매개변수 (이전 상태 정보, 복습 등급 평점, 복습 완료 일시)
    * @returns 연산 완료된 다음 dueAt 일시 및 업데이트된 FsrsState 데이터 페이로드
    */
-  schedule(input: {
+  schedule(input: { state: FsrsState; rating: number; reviewedAt: DateTimeString }): {
+    dueAt: DateTimeString
     state: FsrsState
-    rating: number
-    reviewedAt: DateTimeString
-  }): { dueAt: DateTimeString; state: FsrsState }
+  }
 }
 
 /**
@@ -121,7 +120,9 @@ export function createSchedulingService(
       // 1. reviewedAt 시간 정보가 표준 ISO 8601 UTC 포맷 양식과 일치하는지 철저히 점검합니다.
       const isoUtcRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
       if (!isoUtcRegex.test(reviewedAt) || isNaN(Date.parse(reviewedAt))) {
-        throw new Error('Invalid review date format. Expected ISO 8601 UTC format (e.g. YYYY-MM-DDTHH:mm:ss.sssZ)')
+        throw new Error(
+          'Invalid review date format. Expected ISO 8601 UTC format (e.g. YYYY-MM-DDTHH:mm:ss.sssZ)'
+        )
       }
 
       // 2. 고유 ID를 통해 복습 항목 데이터를 인출합니다.

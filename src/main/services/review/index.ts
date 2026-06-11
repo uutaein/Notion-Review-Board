@@ -169,7 +169,7 @@ function localToUtc(
   // 3. 로컬 시간대에서 포맷해본 결과물과 최초에 목포한 구성 영역값 사이의 편차를 연산합니다.
   const guessParts = getParts(utcDate)
   const targetTime = Date.UTC(year, month - 1, day, hour, minute, second)
-  
+
   // 시스템별로 자정을 24시로 표시하는 경우가 있으므로 이를 0시로 정규화 보정합니다.
   const normalizedGuessHour = guessParts.hour === 24 ? 0 : guessParts.hour
   const actualTimeInTz = Date.UTC(
@@ -218,7 +218,8 @@ function localToUtc(
  */
 export function getLocalDayEndUtc(now: DateTimeString, timeZone: string): DateTimeString {
   // 날짜 및 포맷 데이터 유효성 검사
-  if (isNaN(Date.parse(now))) {
+  const isoUtcRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
+  if (!isoUtcRegex.test(now) || isNaN(Date.parse(now))) {
     throw new Error('Invalid date')
   }
   try {
@@ -299,7 +300,8 @@ export function createTodayReviewService(
   return {
     list({ now, timeZone, sort, filter }: TodayReviewListInput): TodayReviewListResult {
       // 1. 데이터베이스 쿼리를 질의하기 이전에 잘못된 입력 파라미터를 예방 차단합니다.
-      if (isNaN(Date.parse(now))) {
+      const isoUtcRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
+      if (!isoUtcRegex.test(now) || isNaN(Date.parse(now))) {
         throw new Error('Invalid date')
       }
       try {
@@ -324,8 +326,7 @@ export function createTodayReviewService(
           filteredItems = filteredItems.filter((item) => {
             const isCategoryEmpty = !item.category || item.category.trim() === ''
             const isTagsEmpty =
-              !item.tags ||
-              item.tags.map((t) => t.trim()).filter((t) => t !== '').length === 0
+              !item.tags || item.tags.map((t) => t.trim()).filter((t) => t !== '').length === 0
             return isCategoryEmpty && isTagsEmpty
           })
         } else if (filter.kind === 'category') {
@@ -351,7 +352,7 @@ export function createTodayReviewService(
         // 복습 항목의 데이터 소스 명칭 식별
         const source = reader.findSourceById(item.primarySourceId)
         const sourceName = source ? source.name : '알 수 없는 Source'
-        
+
         // 유실되었거나 빈 분류/태그 영역에 대해 최종 사용자용 디폴트 대체 텍스트를 부여
         const displayCategory = getDisplayCategory(item.category)
         const tags = getDisplayTags(item.tags)
