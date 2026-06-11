@@ -181,7 +181,8 @@ export function createNotionSourceMetadataService(dependencies: {
         if (!targetId) {
           throw new Error('INVALID_TARGET')
         }
-        return await client.listProperties(targetId)
+        const resolved = await resolver.resolve(targetId)
+        return await client.listProperties(resolved.targetId)
       } catch (err: any) {
         if (err.message === 'INVALID_TARGET') {
           throw err
@@ -312,7 +313,8 @@ export function createNotionSourceMetadataService(dependencies: {
           throw new Error('INVALID_TARGET')
         }
 
-        const samplePage = await client.fetchSamplePage(targetId)
+        const resolved = await resolver.resolve(targetId)
+        const samplePage = await client.fetchSamplePage(resolved.targetId)
         if (!samplePage) {
           return {
             hasSample: false,
@@ -481,7 +483,7 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
       const dbData = (await dbResponse.json()) as { data_sources?: { id: string }[] }
       const dsId = dbData.data_sources?.[0]?.id
       if (dsId) {
-        return { targetId: normalizeNotionTargetId(dsId), targetType: 'database' }
+        return { targetId: normalizeNotionTargetId(dsId), targetType: 'data_source' }
       }
       throw { status: 404, message: 'No data source found in database' }
     }

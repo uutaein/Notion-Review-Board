@@ -181,22 +181,22 @@ export function createReviewSourceService(dependencies: {
     },
 
     async createSource(input): Promise<ReviewSource> {
-      // 1. Target ID 정규화 및 중복 검사
+      // 1. Target ID 정규화
       const normalizedTargetId = normalizeNotionTargetId(input.target)
       if (!normalizedTargetId) {
         throw new Error('INVALID_TARGET')
       }
 
-      // 동일 Notion Target ID 중복 등록 차단
-      const allSources = database.reviewSources.findAll()
-      const isDuplicate = allSources.some((s) => s.notionTargetId === normalizedTargetId)
-      if (isDuplicate) {
-        throw new Error('DUPLICATE_TARGET')
-      }
-
       // 실시간으로 Notion Target Resolver를 호출하여 실제 Target의 유효성과 타입을 검증합니다.
       const resolveResult = await resolver.resolve(normalizedTargetId)
       const resolvedType = resolveResult.targetType as NotionTargetType
+
+      // 동일 Notion Target ID 중복 등록 차단 (해석된 실제 ID 기준)
+      const allSources = database.reviewSources.findAll()
+      const isDuplicate = allSources.some((s) => s.notionTargetId === resolveResult.targetId)
+      if (isDuplicate) {
+        throw new Error('DUPLICATE_TARGET')
+      }
 
       // 2. 유효성 검증
       validateSourceInput(input)

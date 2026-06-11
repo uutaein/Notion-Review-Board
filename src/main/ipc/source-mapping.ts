@@ -159,9 +159,7 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       const payload = args[0] as any
       validatePayloadKeys(payload, [
         'name',
-        'notionTargetUrl',
-        'notionTargetId',
-        'notionTargetType',
+        'target',
         'enabled',
         'collectionMode',
         'titlePropertyName',
@@ -177,15 +175,13 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       ])
 
       validateStringField(payload.name, 256, false)
-      validateStringField(payload.notionTargetId, 256, false)
-      validateStringField(payload.notionTargetUrl, 2048, true)
+      validateStringField(payload.target, 2048, false)
 
       if (typeof payload.enabled !== 'boolean') {
         throw new Error('INVALID_PAYLOAD')
       }
 
       validateEnumField(payload.collectionMode, ['tag', 'checkbox', 'all'], false)
-      validateEnumField(payload.notionTargetType, ['database', 'data_source', 'unknown'], false)
 
       validateStringField(payload.titlePropertyName, 256, false)
       validateStringField(payload.urlPropertyName, 256, true)

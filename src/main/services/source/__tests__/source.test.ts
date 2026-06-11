@@ -378,6 +378,17 @@ describe('Review Source Service', () => {
       expect(logs[0].id).toBe('log-sole-a')
       expect(logs[0].sourceId).toBe('system-deleted')
     })
+
+    it('TC-SOURCE-022 (keep-history 정책) 시, 복습 항목 상태는 active로 유지되지만 findDue 조회 시에는 system-deleted 필터에 의해 배제됩니다.', () => {
+      service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'keep-history' })
+
+      const soleItem = database.reviewItems.findById('item-sole-a')
+      expect(soleItem).toBeDefined()
+      expect(soleItem?.status).toBe('active')
+
+      const dueItems = database.reviewItems.findDue('2026-06-12T00:00:00Z')
+      expect(dueItems.some((item) => item.id === 'item-sole-a')).toBe(false)
+    })
   })
 
   describe('Source 활성화 정책 (setSourceEnabled)', () => {

@@ -103,6 +103,29 @@ describe('Source and Mapping IPC Boundary', () => {
     )
   })
 
+  it('정상적인 페이로드로 source:create 호출 시, 성공적으로 sourceService.createSource를 호출하고 결과를 반환합니다.', async () => {
+    const event = { senderFrame: { url: 'valid' } }
+    const validPayload = {
+      name: '영어 단어',
+      target: '00000000000000000000000000000abc',
+      enabled: true,
+      collectionMode: 'all',
+      titlePropertyName: 'Word'
+    }
+
+    mockSourceService.createSource.mockResolvedValue({
+      id: 'src_xyz',
+      name: '영어 단어',
+      notionTargetId: '00000000000000000000000000000abc',
+      enabled: true
+    })
+
+    const result = await handlers['source:create'](event, validPayload)
+    expect(result).toBeDefined()
+    expect(result.id).toBe('src_xyz')
+    expect(mockSourceService.createSource).toHaveBeenCalledWith(validPayload)
+  })
+
   it('TC-SOURCE-IPC-004: 내부 예외 발생 시 스택 트레이스 및 민감한 디테일을 숨기고 사전에 정의된 정제된 stable error code를 반환합니다.', async () => {
     mockSourceService.listSources.mockImplementation(() => {
       throw new Error('Raw SQL error details: FOREIGN KEY constraint failed in sqlite_master...')

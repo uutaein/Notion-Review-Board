@@ -29,9 +29,9 @@ describe('Notion Source Metadata Service', () => {
           throw { status: 404, message: 'Not found' }
         }
         if (target.includes('00000000000000000000000000000dbd')) {
-          return { targetId: 'resolved-target-32', targetType: 'database' }
+          return { targetId: 'resolved-target-32', targetType: 'data_source' }
         }
-        return { targetId: 'resolved-target-32', targetType: 'data_source' }
+        return { targetId: target, targetType: 'data_source' }
       })
     }
 
@@ -95,14 +95,14 @@ describe('Notion Source Metadata Service', () => {
   describe('Notion 대상 URL/ID 식별 (resolveTarget)', () => {
     it('TC-MAPPING-006: Notion 토큰 검증 단계가 포함되며, 식별이 성공하면 정상적인 ID와 타입을 제공합니다.', async () => {
       const result = await service.resolveTarget({ target: 'a8aec8ae9b7e411cb3a8e9e1c1234567' })
-      expect(result.targetId).toBe('resolved-target-32')
+      expect(result.targetId).toBe('a8aec8ae9b7e411cb3a8e9e1c1234567')
       expect(result.targetType).toBe('data_source')
     })
 
-    it('Database ID가 입력되는 경우 데이터베이스 타입의 타겟 정보로 해석됩니다.', async () => {
+    it('Database ID가 입력되는 경우 data_source 타입의 타겟 정보로 해석됩니다.', async () => {
       const result = await service.resolveTarget({ target: '00000000000000000000000000000dbd' })
       expect(result.targetId).toBe('resolved-target-32')
-      expect(result.targetType).toBe('database')
+      expect(result.targetType).toBe('data_source')
     })
   })
 
@@ -249,6 +249,24 @@ describe('Notion Source Metadata Service', () => {
 
       expect(result.category).toBe('미분류')
       expect(result.tags).toEqual(['미분류'])
+    })
+
+    it('Database ID를 입력으로 전달할 경우, target을 올바르게 resolve하여 속성 조회가 정상 동작합니다.', async () => {
+      const properties = await service.listProperties({
+        target: '00000000000000000000000000000dbd'
+      })
+      expect(properties).toBeDefined()
+      expect(properties.length).toBeGreaterThan(0)
+      expect(properties[0].name).toBe('Name')
+    })
+
+    it('Database ID를 입력으로 전달할 경우, target을 올바르게 resolve하여 매핑 프리뷰가 정상 동작합니다.', async () => {
+      const result = await service.previewMapping({
+        target: '00000000000000000000000000000dbd',
+        titlePropertyName: 'Name'
+      })
+      expect(result.hasSample).toBe(true)
+      expect(result.title).toBe('테스트 복습 카드')
     })
   })
 })

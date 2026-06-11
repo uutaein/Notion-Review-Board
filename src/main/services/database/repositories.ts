@@ -179,7 +179,7 @@ export class ReviewItemRepository {
       .prepare(
         `
         SELECT * FROM review_items
-        WHERE status = 'active' AND due_at <= ?
+        WHERE status = 'active' AND primary_source_id != 'system-deleted' AND due_at <= ?
         ORDER BY due_at, COALESCE(last_reviewed_at, ''), id
       `
       )
