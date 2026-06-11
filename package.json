@@ -16,6 +16,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test": "vitest run --configLoader runner",
+    "test:watch": "vitest --configLoader runner",
     "test:features": "cucumber-js \"feature/**/*.feature\"",
     "test:features:dry": "cucumber-js \"feature/**/*.feature\" --dry-run --format progress"
   },
@@ -37,6 +39,7 @@
     "typescript": "~5.9.0",
     "typescript-eslint": "^8.0.0",
     "vite": "^7.0.0",
+    "vitest": "^4.1.8",
     "vue-tsc": "^3.0.0"
   },
   "engines": {
