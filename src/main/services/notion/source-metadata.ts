@@ -467,7 +467,9 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
 
     // 404가 아닌 에러(401, 403, 429 등)는 fallback 없이 즉시 전파합니다.
     if (dsResponse.status !== 404) {
-      throw { status: dsResponse.status, message: `Data Source API error ${dsResponse.status}` }
+      const err = new Error(`Data Source API error ${dsResponse.status}`) as any
+      err.status = dsResponse.status
+      throw err
     }
 
     // 2. Data Source가 404인 경우, Database 조회를 수행합니다 (Database URL/ID 지원).
@@ -484,20 +486,28 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
       const dbData = (await dbResponse.json()) as { data_sources?: { id: string }[] }
       const dataSources = dbData.data_sources || []
       if (dataSources.length > 1) {
-        throw { status: 400, message: 'MULTIPLE_DATA_SOURCES_FOUND' }
+        const err = new Error('MULTIPLE_DATA_SOURCES_FOUND') as any
+        err.status = 400
+        throw err
       }
       const dsId = dataSources[0]?.id
       if (dsId) {
         return { targetId: normalizeNotionTargetId(dsId), targetType: 'data_source' }
       }
-      throw { status: 404, message: 'No data source found in database' }
+      const err = new Error('No data source found in database') as any
+      err.status = 404
+      throw err
     }
 
     if (dbResponse.status !== 404) {
-      throw { status: dbResponse.status, message: `Database API error ${dbResponse.status}` }
+      const err = new Error(`Database API error ${dbResponse.status}`) as any
+      err.status = dbResponse.status
+      throw err
     }
 
-    throw { status: 404, message: 'Notion target not found' }
+    const err = new Error('Notion target not found') as any
+    err.status = 404
+    throw err
   }
 }
 
@@ -523,10 +533,9 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
     })
 
     if (!response.ok) {
-      throw {
-        status: response.status,
-        message: `Data source schema fetch error ${response.status}`
-      }
+      const err = new Error(`Data source schema fetch error ${response.status}`) as any
+      err.status = response.status
+      throw err
     }
 
     const data = (await response.json()) as {
@@ -580,9 +589,8 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
       return null
     }
 
-    throw {
-      status: response.status,
-      message: `Data source query error ${response.status}`
-    }
+    const err = new Error(`Data source query error ${response.status}`) as any
+    err.status = response.status
+    throw err
   }
 }

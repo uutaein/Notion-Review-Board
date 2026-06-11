@@ -172,6 +172,31 @@ describe('Review Source Service', () => {
         })
       ).rejects.toThrow('DUPLICATE_TARGET')
     })
+
+    it('소스를 삭제한 후에는 동일한 Notion Target ID를 가진 소스를 다시 등록할 수 있습니다.', async () => {
+      const first = await service.createSource({
+        name: '첫번째 소스',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+        enabled: true,
+        collectionMode: 'all',
+        titlePropertyName: 'Name'
+      })
+
+      // 삭제
+      service.deleteSource({ sourceId: first.id, itemPolicy: 'archive' })
+
+      // 동일 target으로 재등록 성공해야 함
+      const second = await service.createSource({
+        name: '두번째 소스(동일 target)',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
+        enabled: true,
+        collectionMode: 'all',
+        titlePropertyName: 'Name'
+      })
+
+      expect(second.id).toBeDefined()
+      expect(second.id).not.toBe(first.id)
+    })
   })
 
   describe('Source 수정 (updateSource)', () => {
@@ -349,25 +374,25 @@ describe('Review Source Service', () => {
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
       expect(soleItem?.status).toBe('deleted')
-      expect(soleItem?.primarySourceId).toBe(sourceIdA)
+      expect(soleItem?.primarySourceId).toBe('system-deleted')
     })
 
-    it('TC-SOURCE-022 (archive 정책): 단독 참조 복습 항목이 archived 상태로 변경되고 primarySourceId가 유지됩니다.', () => {
+    it('TC-SOURCE-022 (archive 정책): 단독 참조 복습 항목이 archived 상태로 변경되고 primarySourceId가 system-deleted로 변경됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'archive' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
       expect(soleItem?.status).toBe('archived')
-      expect(soleItem?.primarySourceId).toBe(sourceIdA)
+      expect(soleItem?.primarySourceId).toBe('system-deleted')
     })
 
-    it('TC-SOURCE-022 (keep-history 정책): 단독 참조 복습 항목의 히스토리가 유지되며 status가 orphaned로 변경되고 primarySourceId는 유지됩니다.', () => {
+    it('TC-SOURCE-022 (keep-history 정책): 단독 참조 복습 항목의 히스토리가 유지되며 status가 orphaned로 변경되고 primarySourceId는 system-deleted로 변경됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'keep-history' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
       expect(soleItem?.status).toBe('orphaned')
-      expect(soleItem?.primarySourceId).toBe(sourceIdA)
+      expect(soleItem?.primarySourceId).toBe('system-deleted')
     })
 
     it('TC-SOURCE-023: 어떤 소스 삭제 처리 하에서도 기존 복습 로그(Review Log)는 절대 훼손 또는 삭제되지 않으며, sourceId가 원래대로 보존됩니다.', () => {

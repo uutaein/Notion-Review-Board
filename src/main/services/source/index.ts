@@ -86,39 +86,47 @@ export function normalizeNotionTargetId(input: string): string {
   if (!input) return ''
   const trimmed = input.trim()
 
-  // URL 형태인 경우 패스 추출
-  let uuidPart = trimmed
+  // 1. Try to find a hyphenated UUID (36 chars: 8-4-4-4-12)
+  const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  const uuidMatch = trimmed.match(uuidRegex)
+  if (uuidMatch) {
+    return uuidMatch[0].replace(/-/g, '').toLowerCase()
+  }
+
+  // 2. If it's a URL, parse it first to avoid matching hex strings in domain names etc.
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     try {
       const url = new URL(trimmed)
       const pathParts = url.pathname.split('/')
-      // 경로의 마지막 부분 또는 뒤에서 두 번째 부분에서 32자리 UUID를 찾습니다.
-      const match = pathParts.find((p) => p.replace(/-/g, '').length === 32)
-      if (match) {
-        uuidPart = match
-      } else {
-        // v= query parameter 등에서 추출 시도
-        const vParam = url.searchParams.get('v')
-        if (vParam && vParam.length === 32) {
-          uuidPart = vParam
-        } else {
-          // 마지막 슬래시 뒤 전체
-          uuidPart = pathParts[pathParts.length - 1]
+      // Check parts from end to start
+      for (let i = pathParts.length - 1; i >= 0; i--) {
+        const part = pathParts[i]
+        // Notion page/database ID is at the end of a slug, separated by a hyphen, or is the segment itself.
+        // e.g. "My-Database-a8aec8ae9b7e411cb3a8e9e1c1234567" or "a8aec8ae9b7e411cb3a8e9e1c1234567"
+        const hex32Match = part.match(/[0-9a-f]{32}$/i)
+        if (hex32Match) {
+          return hex32Match[0].toLowerCase()
+        }
+      }
+      // Also check query parameters (like ?v=...)
+      for (const [, value] of url.searchParams.entries()) {
+        const hex32Match = value.match(/[0-9a-f]{32}$/i)
+        if (hex32Match) {
+          return hex32Match[0].toLowerCase()
         }
       }
     } catch {
-      // 파싱 실패 시 원본 문자열 유지
+      // Fallback to plain regex search if URL parsing fails
     }
   }
 
-  // 대시 제거 및 32자리 16진수 검사
-  const cleaned = uuidPart.replace(/-/g, '').toLowerCase()
-  const hex32Regex = /^[0-9a-f]{32}$/
-  if (hex32Regex.test(cleaned)) {
-    return cleaned
+  // 3. Fallback: match any 32-character hex string in the trimmed input
+  const hex32Regex = /[0-9a-f]{32}/i
+  const hexMatch = trimmed.match(hex32Regex)
+  if (hexMatch) {
+    return hexMatch[0].toLowerCase()
   }
 
-  // 정규화 실패 시 빈 문자열 반환
   return ''
 }
 
@@ -398,7 +406,7 @@ export function createReviewSourceService(dependencies: {
                 .prepare(
                   `
                 UPDATE review_items
-                SET status = 'deleted', source_ids_json = ?, updated_at = ?, deleted_detected_at = ?
+                SET status = 'deleted', primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?, deleted_detected_at = ?
                 WHERE id = ?
               `
                 )
@@ -414,7 +422,7 @@ export function createReviewSourceService(dependencies: {
                 .prepare(
                   `
                 UPDATE review_items
-                SET status = 'archived', source_ids_json = ?, updated_at = ?
+                SET status = 'archived', primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?
                 WHERE id = ?
               `
                 )
@@ -425,7 +433,7 @@ export function createReviewSourceService(dependencies: {
                 .prepare(
                   `
                 UPDATE review_items
-                SET status = 'orphaned', source_ids_json = ?, updated_at = ?
+                SET status = 'orphaned', primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?
                 WHERE id = ?
               `
                 )

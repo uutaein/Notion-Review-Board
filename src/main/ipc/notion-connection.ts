@@ -38,7 +38,12 @@ function sanitizeIpcError(err: unknown): Error {
     'DISALLOWED_ENCRYPTION_BACKEND'
   ]
 
-  const originalMessage = err instanceof Error ? err.message : ''
+  const originalMessage =
+    err instanceof Error
+      ? err.message
+      : err && typeof err === 'object' && 'message' in err
+        ? String((err as any).message)
+        : String(err)
   // 예외 메시지가 사전에 승인된 보안 안전한 공개 오류 코드 목록에 들어 있는지 대조합니다.
   const cleanMessage = publicCodes.includes(originalMessage) ? originalMessage : 'INTERNAL_ERROR'
 

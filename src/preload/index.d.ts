@@ -46,11 +46,34 @@ export interface UpdateSourceInput {
   filterValue?: string | null
 }
 
+export interface ReviewSourceDto {
+  id: string
+  name: string
+  notionTargetId: string
+  notionTargetUrl: string | null
+  notionTargetType: string
+  enabled: boolean
+  collectionMode: string
+  titlePropertyName: string
+  urlPropertyName: string | null
+  categoryPropertyName: string | null
+  tagPropertyName: string | null
+  sourcePropertyName: string | null
+  reviewCheckboxPropertyName: string | null
+  lastEditedPropertyName: string | null
+  filterPropertyName: string | null
+  filterOperator: string | null
+  filterValue: string | null
+  lastSyncedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ReviewSourceAPI {
-  listSources: () => Promise<ReviewSource[]>
-  getSource: (payload: { sourceId: string }) => Promise<ReviewSource | null>
-  createSource: (payload: CreateSourceInput) => Promise<ReviewSource>
-  updateSource: (payload: UpdateSourceInput) => Promise<ReviewSource>
+  listSources: () => Promise<ReviewSourceDto[]>
+  getSource: (payload: { sourceId: string }) => Promise<ReviewSourceDto | null>
+  createSource: (payload: CreateSourceInput) => Promise<ReviewSourceDto>
+  updateSource: (payload: UpdateSourceInput) => Promise<ReviewSourceDto>
   getDeleteImpact: (payload: {
     sourceId: string
   }) => Promise<{ soleReferencedItemCount: number; sharedReferencedItemCount: number }>
@@ -58,7 +81,7 @@ export interface ReviewSourceAPI {
     sourceId: string
     itemPolicy: 'archive' | 'delete' | 'keep-history'
   }) => Promise<{ success: boolean }>
-  setEnabled: (payload: { sourceId: string; enabled: boolean }) => Promise<ReviewSource>
+  setEnabled: (payload: { sourceId: string; enabled: boolean }) => Promise<ReviewSourceDto>
 }
 
 export interface ResolveTargetResult {

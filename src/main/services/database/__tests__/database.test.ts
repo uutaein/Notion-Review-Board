@@ -102,7 +102,7 @@ describe('database service', () => {
     })
     expect(
       database.connection.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()
-    ).toEqual({ count: 3 })
+    ).toEqual({ count: 4 })
   })
 
   it('returns only active due items in schedule order', () => {

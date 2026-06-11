@@ -8,6 +8,56 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReviewSourceService } from '../services/source'
 import { NotionSourceMetadataService } from '../services/notion/source-metadata'
+import type { ReviewSource } from '../../shared/domain/source'
+
+export interface ReviewSourceDto {
+  id: string
+  name: string
+  notionTargetId: string
+  notionTargetUrl: string | null
+  notionTargetType: string
+  enabled: boolean
+  collectionMode: string
+  titlePropertyName: string
+  urlPropertyName: string | null
+  categoryPropertyName: string | null
+  tagPropertyName: string | null
+  sourcePropertyName: string | null
+  reviewCheckboxPropertyName: string | null
+  lastEditedPropertyName: string | null
+  filterPropertyName: string | null
+  filterOperator: string | null
+  filterValue: string | null
+  lastSyncedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export function mapSourceToDto(source: ReviewSource): ReviewSourceDto {
+  return {
+    id: source.id,
+    name: source.name,
+    notionTargetId: source.notionTargetId,
+    notionTargetUrl: source.notionTargetUrl,
+    notionTargetType: source.notionTargetType,
+    enabled: source.enabled,
+    collectionMode: source.collectionMode,
+    titlePropertyName: source.titlePropertyName,
+    urlPropertyName: source.urlPropertyName,
+    categoryPropertyName: source.categoryPropertyName,
+    tagPropertyName: source.tagPropertyName,
+    sourcePropertyName: source.sourcePropertyName,
+    reviewCheckboxPropertyName: source.reviewCheckboxPropertyName,
+    lastEditedPropertyName: source.lastEditedPropertyName,
+    filterPropertyName: source.filterPropertyName,
+    filterOperator: source.filterOperator,
+    filterValue: source.filterValue,
+    lastSyncedAt: source.lastSyncedAt,
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt
+  }
+}
+
 
 /**
  * IPC 채널 등록 시 주입받아야 하는 의존성 사양입니다.
@@ -49,7 +99,12 @@ function sanitizeIpcError(err: unknown): Error {
     'MULTIPLE_DATA_SOURCES_FOUND'
   ]
 
-  const originalMessage = err instanceof Error ? err.message : ''
+  const originalMessage =
+    err instanceof Error
+      ? err.message
+      : err && typeof err === 'object' && 'message' in err
+        ? String((err as any).message)
+        : String(err)
   const cleanMessage = publicCodes.includes(originalMessage) ? originalMessage : 'INTERNAL_ERROR'
 
   const cleanError = new Error(cleanMessage)
@@ -132,7 +187,8 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       if (args.length !== 0) {
         throw new Error('INVALID_PAYLOAD')
       }
-      return sourceService.listSources()
+      const sources = sourceService.listSources()
+      return sources.map(mapSourceToDto)
     })
   )
 
@@ -146,7 +202,8 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       const payload = args[0] as any
       validatePayloadKeys(payload, ['sourceId'])
       validateStringField(payload.sourceId, 64, false)
-      return sourceService.getSource({ sourceId: payload.sourceId })
+      const source = sourceService.getSource({ sourceId: payload.sourceId })
+      return source ? mapSourceToDto(source) : null
     })
   )
 
@@ -195,7 +252,8 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       validateEnumField(payload.filterOperator, ['equals', 'contains', 'checked'], true)
       validateStringField(payload.filterValue, 256, true)
 
-      return await sourceService.createSource(payload)
+      const created = await sourceService.createSource(payload)
+      return mapSourceToDto(created)
     })
   )
 
@@ -244,7 +302,8 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       validateEnumField(payload.filterOperator, ['equals', 'contains', 'checked'], true)
       validateStringField(payload.filterValue, 256, true)
 
-      return sourceService.updateSource(payload)
+      const updated = sourceService.updateSource(payload)
+      return mapSourceToDto(updated)
     })
   )
 
@@ -295,10 +354,11 @@ export function registerSourceMappingIpc(dependencies: SourceMappingIpcDependenc
       if (typeof payload.enabled !== 'boolean') {
         throw new Error('INVALID_PAYLOAD')
       }
-      return sourceService.setSourceEnabled({
+      const enabled = sourceService.setSourceEnabled({
         sourceId: payload.sourceId,
         enabled: payload.enabled
       })
+      return mapSourceToDto(enabled)
     })
   )
 

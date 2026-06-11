@@ -117,7 +117,23 @@ describe('Source and Mapping IPC Boundary', () => {
       id: 'src_xyz',
       name: '영어 단어',
       notionTargetId: '00000000000000000000000000000abc',
-      enabled: true
+      notionTargetUrl: null,
+      notionTargetType: 'database',
+      enabled: true,
+      collectionMode: 'all',
+      titlePropertyName: 'Word',
+      urlPropertyName: null,
+      categoryPropertyName: null,
+      tagPropertyName: null,
+      sourcePropertyName: null,
+      reviewCheckboxPropertyName: null,
+      lastEditedPropertyName: null,
+      filterPropertyName: null,
+      filterOperator: null,
+      filterValue: null,
+      lastSyncedAt: null,
+      createdAt: '2026-06-11T00:00:00.000Z',
+      updatedAt: '2026-06-11T00:00:00.000Z'
     })
 
     const result = await handlers['source:create'](event, validPayload)
