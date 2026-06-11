@@ -55,8 +55,7 @@ describe('Review Source Service', () => {
     it('TC-SOURCE-001/002: 유효한 정보를 기입하면 자동으로 ID와 UTC 생성 시각이 부여된 소스가 생성됩니다.', async () => {
       const result = await service.createSource({
         name: '수학 복습',
-        notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-        notionTargetType: 'database',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
         enabled: true,
         collectionMode: 'all',
         titlePropertyName: 'Name'
@@ -74,8 +73,7 @@ describe('Review Source Service', () => {
       await expect(
         service.createSource({
           name: '   ',
-          notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-          notionTargetType: 'database',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
           enabled: true,
           collectionMode: 'all',
           titlePropertyName: 'Name'
@@ -87,8 +85,7 @@ describe('Review Source Service', () => {
       await expect(
         service.createSource({
           name: '공부',
-          notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-          notionTargetType: 'database',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
           enabled: true,
           collectionMode: 'all',
           titlePropertyName: '   '
@@ -101,8 +98,7 @@ describe('Review Source Service', () => {
       await expect(
         service.createSource({
           name: '공부',
-          notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-          notionTargetType: 'database',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
           enabled: true,
           collectionMode: 'tag',
           titlePropertyName: 'Name',
@@ -114,8 +110,7 @@ describe('Review Source Service', () => {
       await expect(
         service.createSource({
           name: '공부',
-          notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-          notionTargetType: 'database',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
           enabled: true,
           collectionMode: 'tag',
           titlePropertyName: 'Name',
@@ -130,8 +125,7 @@ describe('Review Source Service', () => {
       await expect(
         service.createSource({
           name: '공부',
-          notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-          notionTargetType: 'database',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
           enabled: true,
           collectionMode: 'checkbox',
           titlePropertyName: 'Name',
@@ -143,8 +137,7 @@ describe('Review Source Service', () => {
     it('TC-SOURCE-009: all 모드 시 불필요한 태그 및 체크박스 필터 설정값들은 안전하게 무시/정리됩니다.', async () => {
       const result = await service.createSource({
         name: '전체 수집공부',
-        notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-        notionTargetType: 'database',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
         enabled: true,
         collectionMode: 'all',
         titlePropertyName: 'Name',
@@ -163,8 +156,7 @@ describe('Review Source Service', () => {
     it('TC-SOURCE-011: 중복된 Notion Target ID를 가진 소스가 이미 존재한다면 생성이 차단됩니다.', async () => {
       await service.createSource({
         name: '첫번째 소스',
-        notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-        notionTargetType: 'database',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
         enabled: true,
         collectionMode: 'all',
         titlePropertyName: 'Name'
@@ -173,8 +165,7 @@ describe('Review Source Service', () => {
       await expect(
         service.createSource({
           name: '두번째 소스(중복 target)',
-          notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-          notionTargetType: 'database',
+          target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
           enabled: true,
           collectionMode: 'all',
           titlePropertyName: 'Name'
@@ -189,8 +180,7 @@ describe('Review Source Service', () => {
     beforeEach(async () => {
       const source = await service.createSource({
         name: '원본 소스',
-        notionTargetId: 'a8aec8ae-9b7e-411c-b3a8-e9e1c1234567',
-        notionTargetType: 'database',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
         enabled: true,
         collectionMode: 'all',
         titlePropertyName: 'Name'
@@ -253,8 +243,7 @@ describe('Review Source Service', () => {
       // 2개의 소스 등록
       const srcA = await service.createSource({
         name: '소스 A',
-        notionTargetId: 'a8aec8ae9b7e411cb3a8e9e1c1234561',
-        notionTargetType: 'database',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234561',
         enabled: true,
         collectionMode: 'all',
         titlePropertyName: 'Name'
@@ -263,8 +252,7 @@ describe('Review Source Service', () => {
 
       const srcB = await service.createSource({
         name: '소스 B',
-        notionTargetId: 'a8aec8ae9b7e411cb3a8e9e1c1234562',
-        notionTargetType: 'database',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234562',
         enabled: true,
         collectionMode: 'all',
         titlePropertyName: 'Name'
@@ -398,8 +386,7 @@ describe('Review Source Service', () => {
     beforeEach(async () => {
       const source = await service.createSource({
         name: '활성 소스',
-        notionTargetId: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
-        notionTargetType: 'database',
+        target: 'a8aec8ae9b7e411cb3a8e9e1c1234567',
         enabled: true,
         collectionMode: 'all',
         titlePropertyName: 'Name'
@@ -443,6 +430,42 @@ describe('Review Source Service', () => {
       // 재활성화
       const enabledSource = service.setSourceEnabled({ sourceId, enabled: true })
       expect(enabledSource.enabled).toBe(true)
+    })
+  })
+
+  describe('System Source Protection', () => {
+    it('system-deleted 소스는 listSources 목록에 포함되지 않습니다.', () => {
+      const list = service.listSources()
+      expect(list.some((s: any) => s.id === 'system-deleted')).toBe(false)
+    })
+
+    it('system-deleted 소스는 getSource 상세 조회 결과 null을 반환합니다.', () => {
+      const src = service.getSource({ sourceId: 'system-deleted' })
+      expect(src).toBeNull()
+    })
+
+    it('system-deleted 소스 변경, 삭제, 활성화 시도 시 SYSTEM_SOURCE_PROTECTED 에러가 발생합니다.', () => {
+      expect(() => {
+        service.updateSource({
+          id: 'system-deleted',
+          name: '수정 시도',
+          enabled: true,
+          collectionMode: 'all',
+          titlePropertyName: 'Name'
+        })
+      }).toThrow('SYSTEM_SOURCE_PROTECTED')
+
+      expect(() => {
+        service.deleteSource({ sourceId: 'system-deleted', itemPolicy: 'delete' })
+      }).toThrow('SYSTEM_SOURCE_PROTECTED')
+
+      expect(() => {
+        service.setSourceEnabled({ sourceId: 'system-deleted', enabled: true })
+      }).toThrow('SYSTEM_SOURCE_PROTECTED')
+
+      expect(() => {
+        service.getDeleteImpact({ sourceId: 'system-deleted' })
+      }).toThrow('SYSTEM_SOURCE_PROTECTED')
     })
   })
 })

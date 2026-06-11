@@ -44,7 +44,8 @@ function sanitizeIpcError(err: unknown): Error {
     'INVALID_TITLE_MAPPING',
     'INVALID_TAG_FILTER',
     'INVALID_CHECKBOX_MAPPING',
-    'INVALID_TARGET'
+    'INVALID_TARGET',
+    'SYSTEM_SOURCE_PROTECTED'
   ]
 
   const originalMessage = err instanceof Error ? err.message : ''

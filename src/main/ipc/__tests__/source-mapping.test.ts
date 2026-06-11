@@ -84,7 +84,7 @@ describe('Source and Mapping IPC Boundary', () => {
     // 허용하지 않는 수집 모드
     const badCreatePayload = {
       name: '공부',
-      notionTargetId: 'abc',
+      target: '00000000000000000000000000000abc',
       enabled: true,
       collectionMode: 'invalid_mode', // 허용 외
       titlePropertyName: 'Name'

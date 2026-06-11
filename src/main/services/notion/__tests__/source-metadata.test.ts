@@ -28,6 +28,9 @@ describe('Notion Source Metadata Service', () => {
         if (target.includes('ffffffffffffffffffffffffffffffff')) {
           throw { status: 404, message: 'Not found' }
         }
+        if (target.includes('00000000000000000000000000000dbd')) {
+          return { targetId: 'resolved-target-32', targetType: 'database' }
+        }
         return { targetId: 'resolved-target-32', targetType: 'data_source' }
       })
     }
@@ -94,6 +97,12 @@ describe('Notion Source Metadata Service', () => {
       const result = await service.resolveTarget({ target: 'a8aec8ae9b7e411cb3a8e9e1c1234567' })
       expect(result.targetId).toBe('resolved-target-32')
       expect(result.targetType).toBe('data_source')
+    })
+
+    it('Database ID가 입력되는 경우 데이터베이스 타입의 타겟 정보로 해석됩니다.', async () => {
+      const result = await service.resolveTarget({ target: '00000000000000000000000000000dbd' })
+      expect(result.targetId).toBe('resolved-target-32')
+      expect(result.targetType).toBe('database')
     })
   })
 

@@ -448,8 +448,8 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
       throw new Error('UNAUTHORIZED')
     }
 
-    // 데이터 소스 존재 여부 및 권한 판정을 시도합니다.
-    const response = await fetch(`https://api.notion.com/v1/data_sources/${targetId}`, {
+    // 1. Data Source 조회를 우선적으로 시도합니다.
+    const dsResponse = await fetch(`https://api.notion.com/v1/data_sources/${targetId}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -458,15 +458,39 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
       signal: AbortSignal.timeout(10000)
     })
 
-    if (response.ok) {
+    if (dsResponse.ok) {
       return { targetId, targetType: 'data_source' }
     }
 
-    if (response.status === 404) {
-      throw { status: 404, message: 'Notion target not found' }
+    // 404가 아닌 에러(401, 403, 429 등)는 fallback 없이 즉시 전파합니다.
+    if (dsResponse.status !== 404) {
+      throw { status: dsResponse.status, message: `Data Source API error ${dsResponse.status}` }
     }
 
-    throw { status: response.status, message: `Data Source API error ${response.status}` }
+    // 2. Data Source가 404인 경우, Database 조회를 수행합니다 (Database URL/ID 지원).
+    const dbResponse = await fetch(`https://api.notion.com/v1/databases/${targetId}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Notion-Version': '2026-03-11'
+      },
+      signal: AbortSignal.timeout(10000)
+    })
+
+    if (dbResponse.ok) {
+      const dbData = (await dbResponse.json()) as { data_sources?: { id: string }[] }
+      const dsId = dbData.data_sources?.[0]?.id
+      if (dsId) {
+        return { targetId: normalizeNotionTargetId(dsId), targetType: 'database' }
+      }
+      throw { status: 404, message: 'No data source found in database' }
+    }
+
+    if (dbResponse.status !== 404) {
+      throw { status: dbResponse.status, message: `Database API error ${dbResponse.status}` }
+    }
+
+    throw { status: 404, message: 'Notion target not found' }
   }
 }
 
@@ -510,9 +534,7 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
     }))
   }
 
-  async fetchSamplePage(
-    targetId: string
-  ): Promise<{
+  async fetchSamplePage(targetId: string): Promise<{
     id: string
     url: string
     properties: Record<string, any>
@@ -551,7 +573,14 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
       return null
     }
 
-    // 단독 페이지(data_source)인 경우 해당 페이지 정보를 가져옵니다.
+    if (response.status !== 404) {
+      throw {
+        status: response.status,
+        message: `Data source query error ${response.status}`
+      }
+    }
+
+    // 단독 페이지(data_source)인 경우 해당 페이지 정보를 가져옵니다 (404 불일치 시에만 fallback).
     const pageResp = await fetch(`https://api.notion.com/v1/pages/${targetId}`, {
       method: 'GET',
       headers: {
@@ -571,6 +600,9 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
       }
     }
 
-    throw { status: pageResp.status, message: `Failed to fetch sample page ${pageResp.status}` }
+    throw {
+      status: pageResp.status,
+      message: `Failed to fetch sample page ${pageResp.status}`
+    }
   }
 }

@@ -35,9 +35,7 @@ export interface ReviewSourceService {
   /** 새로운 복습 소스를 유효성 검사 후 저장소에 등록합니다. */
   createSource(input: {
     name: string
-    notionTargetUrl: string | null
-    notionTargetId: string
-    notionTargetType: NotionTargetType
+    target: string
     enabled: boolean
     collectionMode: CollectionMode
     titlePropertyName: string
@@ -174,18 +172,17 @@ export function createReviewSourceService(dependencies: {
 
   return {
     listSources(): ReviewSource[] {
-      return database.reviewSources.findAll()
+      return database.reviewSources.findAll().filter((s) => s.id !== 'system-deleted')
     },
 
     getSource({ sourceId }): ReviewSource | null {
+      if (sourceId === 'system-deleted') return null
       return database.reviewSources.findById(sourceId)
     },
 
     async createSource(input): Promise<ReviewSource> {
       // 1. Target ID 정규화 및 중복 검사
-      const normalizedTargetId = normalizeNotionTargetId(
-        input.notionTargetId || input.notionTargetUrl || ''
-      )
+      const normalizedTargetId = normalizeNotionTargetId(input.target)
       if (!normalizedTargetId) {
         throw new Error('INVALID_TARGET')
       }
@@ -229,8 +226,8 @@ export function createReviewSourceService(dependencies: {
       const newSource: ReviewSource = {
         id: sourceId,
         name: input.name.trim(),
-        notionTargetId: normalizedTargetId as NotionTargetId,
-        notionTargetUrl: input.notionTargetUrl || null,
+        notionTargetId: resolveResult.targetId as NotionTargetId,
+        notionTargetUrl: input.target.startsWith('http') ? input.target : null,
         notionTargetType: resolvedType,
         enabled: input.enabled ?? true,
         collectionMode: input.collectionMode,
@@ -257,6 +254,9 @@ export function createReviewSourceService(dependencies: {
     },
 
     updateSource(input): ReviewSource {
+      if (input.id === 'system-deleted') {
+        throw new Error('SYSTEM_SOURCE_PROTECTED')
+      }
       const existing = database.reviewSources.findById(input.id)
       if (!existing) {
         throw new Error('SOURCE_NOT_FOUND')
@@ -308,6 +308,9 @@ export function createReviewSourceService(dependencies: {
     },
 
     getDeleteImpact({ sourceId }): SourceDeleteImpact {
+      if (sourceId === 'system-deleted') {
+        throw new Error('SYSTEM_SOURCE_PROTECTED')
+      }
       const existing = database.reviewSources.findById(sourceId)
       if (!existing) {
         throw new Error('SOURCE_NOT_FOUND')
@@ -343,6 +346,9 @@ export function createReviewSourceService(dependencies: {
     },
 
     deleteSource({ sourceId, itemPolicy }): void {
+      if (sourceId === 'system-deleted') {
+        throw new Error('SYSTEM_SOURCE_PROTECTED')
+      }
       const existing = database.reviewSources.findById(sourceId)
       if (!existing) {
         throw new Error('SOURCE_NOT_FOUND')
@@ -380,7 +386,9 @@ export function createReviewSourceService(dependencies: {
           primary_source_id: string
           source_ids_json: string
         }
-        const items = database.connection.prepare('SELECT * FROM review_items').all() as ReviewItemRow[]
+        const items = database.connection
+          .prepare('SELECT * FROM review_items')
+          .all() as ReviewItemRow[]
 
         for (const itemRow of items) {
           const sourceIds = JSON.parse(itemRow.source_ids_json) as string[]
@@ -458,6 +466,9 @@ export function createReviewSourceService(dependencies: {
     },
 
     setSourceEnabled({ sourceId, enabled }): ReviewSource {
+      if (sourceId === 'system-deleted') {
+        throw new Error('SYSTEM_SOURCE_PROTECTED')
+      }
       const existing = database.reviewSources.findById(sourceId)
       if (!existing) {
         throw new Error('SOURCE_NOT_FOUND')
