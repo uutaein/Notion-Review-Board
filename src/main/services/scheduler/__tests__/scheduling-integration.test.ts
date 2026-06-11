@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createDatabaseService, type DatabaseService } from '../../database'
 import { createSchedulingService } from '..'
-import type { ReviewLogId } from '../../../../shared/domain/types'
+import type { ReviewLogId, DateTimeString } from '../../../../shared/domain/types'
 import { createReviewItem, createReviewSource, itemId, reviewedAt } from './fixtures'
 
 describe('review scheduling persistence integration', () => {
@@ -22,7 +22,7 @@ describe('review scheduling persistence integration', () => {
           throw new Error('not used')
         },
         schedule: ({ state }) => ({
-          dueAt: '2026-06-18T12:00:00.000Z',
+          dueAt: '2026-06-18T12:00:00.000Z' as DateTimeString,
           state: {
             version: state.version,
             payload: { ...state.payload, stability: 2.5, reps: 1 }
