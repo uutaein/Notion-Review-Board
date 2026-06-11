@@ -349,42 +349,42 @@ describe('Review Source Service', () => {
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
       expect(soleItem?.status).toBe('deleted')
-      expect(soleItem?.primarySourceId).toBe('system-deleted')
+      expect(soleItem?.primarySourceId).toBe(sourceIdA)
     })
 
-    it('TC-SOURCE-022 (archive 정책): 단독 참조 복습 항목이 archived 상태로 변경되고 primarySourceId가 system-deleted가 됩니다.', () => {
+    it('TC-SOURCE-022 (archive 정책): 단독 참조 복습 항목이 archived 상태로 변경되고 primarySourceId가 유지됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'archive' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
       expect(soleItem?.status).toBe('archived')
-      expect(soleItem?.primarySourceId).toBe('system-deleted')
+      expect(soleItem?.primarySourceId).toBe(sourceIdA)
     })
 
-    it('TC-SOURCE-022 (keep-history 정책): 단독 참조 복습 항목의 히스토리가 유지되며 primarySourceId가 system-deleted로 대피됩니다.', () => {
+    it('TC-SOURCE-022 (keep-history 정책): 단독 참조 복습 항목의 히스토리가 유지되며 status가 orphaned로 변경되고 primarySourceId는 유지됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'keep-history' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
-      expect(soleItem?.status).toBe('active') // 원래 active 유지
-      expect(soleItem?.primarySourceId).toBe('system-deleted')
+      expect(soleItem?.status).toBe('orphaned')
+      expect(soleItem?.primarySourceId).toBe(sourceIdA)
     })
 
-    it('TC-SOURCE-023: 어떤 소스 삭제 처리 하에서도 기존 복습 로그(Review Log)는 절대 훼손 또는 삭제되지 않으며, sourceId가 system-deleted로 변경됩니다.', () => {
+    it('TC-SOURCE-023: 어떤 소스 삭제 처리 하에서도 기존 복습 로그(Review Log)는 절대 훼손 또는 삭제되지 않으며, sourceId가 원래대로 보존됩니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'delete' })
 
       const logs = database.reviewLogs.findByItemId('item-sole-a' as any)
       expect(logs.length).toBe(1) // 로그는 안전하게 보존됨
       expect(logs[0].id).toBe('log-sole-a')
-      expect(logs[0].sourceId).toBe('system-deleted')
+      expect(logs[0].sourceId).toBe(sourceIdA)
     })
 
-    it('TC-SOURCE-022 (keep-history 정책) 시, 복습 항목 상태는 active로 유지되지만 findDue 조회 시에는 system-deleted 필터에 의해 배제됩니다.', () => {
+    it('TC-SOURCE-022 (keep-history 정책) 시, 복습 항목 상태는 orphaned로 변경되어 findDue 조회 시 노출되지 않습니다.', () => {
       service.deleteSource({ sourceId: sourceIdA, itemPolicy: 'keep-history' })
 
       const soleItem = database.reviewItems.findById('item-sole-a')
       expect(soleItem).toBeDefined()
-      expect(soleItem?.status).toBe('active')
+      expect(soleItem?.status).toBe('orphaned')
 
       const dueItems = database.reviewItems.findDue('2026-06-12T00:00:00Z')
       expect(dueItems.some((item) => item.id === 'item-sole-a')).toBe(false)

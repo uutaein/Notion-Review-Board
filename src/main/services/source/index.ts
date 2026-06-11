@@ -13,6 +13,7 @@ import type {
 import type { ReviewSourceId, NotionTargetId, DateTimeString } from '../../../shared/domain/types'
 import type { DatabaseService } from '../database'
 import type { NotionTargetResolver } from '../notion/source-metadata'
+import { randomUUID } from 'crypto'
 
 /**
  * Source 삭제 시 영향을 받는 복습 항목의 통계 구조체입니다.
@@ -221,7 +222,7 @@ export function createReviewSourceService(dependencies: {
       }
 
       const now = new Date().toISOString()
-      const sourceId = `src_${Math.random().toString(36).substr(2, 9)}` as ReviewSourceId
+      const sourceId = `src_${randomUUID()}` as ReviewSourceId
 
       const newSource: ReviewSource = {
         id: sourceId,
@@ -243,10 +244,11 @@ export function createReviewSourceService(dependencies: {
         filterValue: filterVal,
         lastSyncedAt: null,
         createdAt: now as DateTimeString,
-        updatedAt: now as DateTimeString
+        updatedAt: now as DateTimeString,
+        deletedAt: null
       }
 
-      database.reviewSources.save(newSource)
+      database.reviewSources.insert(newSource)
       logger?.info(
         `새로운 Review Source가 생성되었습니다: ID: ${sourceId}, Target: ${normalizedTargetId}`
       )
@@ -302,7 +304,7 @@ export function createReviewSourceService(dependencies: {
         updatedAt: new Date().toISOString() as DateTimeString
       }
 
-      database.reviewSources.save(updatedSource)
+      database.reviewSources.update(updatedSource)
       logger?.info(`Review Source 설정이 갱신되었습니다: ID: ${input.id}`)
       return updatedSource
     },
@@ -358,27 +360,19 @@ export function createReviewSourceService(dependencies: {
       }
 
       const deleteTransaction = database.connection.transaction(() => {
-        // 1. review_logs 테이블의 source_id를 'system-deleted'로 일괄 변경하여 외래 키 제약 조건 준수
+        // Soft delete: review_sources의 deleted_at을 채웁니다.
         database.connection
           .prepare(
             `
-          UPDATE review_logs
-          SET source_id = 'system-deleted'
-          WHERE source_id = ?
+          UPDATE review_sources
+          SET deleted_at = ?
+          WHERE id = ?
         `
           )
-          .run(sourceId)
+          .run(new Date().toISOString(), sourceId)
 
-        // 2. sync_events 테이블의 source_id를 'system-deleted'로 일괄 변경
-        database.connection
-          .prepare(
-            `
-          UPDATE sync_events
-          SET source_id = 'system-deleted'
-          WHERE source_id = ?
-        `
-          )
-          .run(sourceId)
+        // 1. review_logs 테이블의 source_id는 원래 소스를 유지하므로 변경할 필요가 없음.
+        // 2. sync_events 테이블의 source_id도 원래 소스를 유지하므로 변경할 필요가 없음.
 
         // 3. 영향 받는 복습 항목들 처리
         interface ReviewItemRow {
@@ -399,12 +393,12 @@ export function createReviewSourceService(dependencies: {
           if (newSourceIds.length === 0) {
             // 단독 참조 복습 항목인 경우 정책에 따름
             if (itemPolicy === 'delete') {
-              // 물리 삭제는 review_logs 테이블 등의 외래 키를 깨뜨리므로 'deleted' 상태로 soft-delete 처리하고 기본 소스를 안전망으로 이동
+              // soft-delete 처리
               database.connection
                 .prepare(
                   `
                 UPDATE review_items
-                SET status = 'deleted', primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?, deleted_detected_at = ?
+                SET status = 'deleted', source_ids_json = ?, updated_at = ?, deleted_detected_at = ?
                 WHERE id = ?
               `
                 )
@@ -420,18 +414,18 @@ export function createReviewSourceService(dependencies: {
                 .prepare(
                   `
                 UPDATE review_items
-                SET status = 'archived', primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?
+                SET status = 'archived', source_ids_json = ?, updated_at = ?
                 WHERE id = ?
               `
                 )
                 .run(JSON.stringify([]), new Date().toISOString(), itemRow.id)
             } else if (itemPolicy === 'keep-history') {
-              // 상태 유지하며 basic metadata만 안전망으로 대피하여 히스토리 유지
+              // orphaned 상태로 전환하여 복습 목록에서 제외하고 히스토리 보존
               database.connection
                 .prepare(
                   `
                 UPDATE review_items
-                SET primary_source_id = 'system-deleted', source_ids_json = ?, updated_at = ?
+                SET status = 'orphaned', source_ids_json = ?, updated_at = ?
                 WHERE id = ?
               `
                 )
@@ -441,7 +435,6 @@ export function createReviewSourceService(dependencies: {
             // 여러 소스에서 공유 중인 복습 항목인 경우
             let newPrimary = itemRow.primary_source_id
             if (itemRow.primary_source_id === sourceId) {
-              // 기본 소스가 지워진 소스인 경우 남은 소스 중 첫 번째를 기본 소스로 지정
               newPrimary = newSourceIds[0]
             }
 
@@ -456,13 +449,10 @@ export function createReviewSourceService(dependencies: {
               .run(newPrimary, JSON.stringify(newSourceIds), new Date().toISOString(), itemRow.id)
           }
         }
-
-        // 4. 소스 삭제 (외래 키가 모두 정리되었으므로 문제없이 정상 동작함)
-        database.connection.prepare('DELETE FROM review_sources WHERE id = ?').run(sourceId)
       })
 
       deleteTransaction()
-      logger?.info(`Review Source가 삭제되었습니다: ID: ${sourceId}, 정책: ${itemPolicy}`)
+      logger?.info(`Review Source가 소프트 삭제되었습니다: ID: ${sourceId}, 정책: ${itemPolicy}`)
     },
 
     setSourceEnabled({ sourceId, enabled }): ReviewSource {
@@ -480,7 +470,7 @@ export function createReviewSourceService(dependencies: {
         updatedAt: new Date().toISOString() as DateTimeString
       }
 
-      database.reviewSources.save(updated)
+      database.reviewSources.update(updated)
       logger?.info(`Review Source 활성화 상태가 변경되었습니다: ID: ${sourceId}, 상태: ${enabled}`)
       return updated
     }

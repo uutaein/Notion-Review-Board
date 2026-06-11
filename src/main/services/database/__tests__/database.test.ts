@@ -37,7 +37,8 @@ function source(): ReviewSource {
     filterValue: null,
     lastSyncedAt: null,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    deletedAt: null
   }
 }
 
@@ -101,7 +102,7 @@ describe('database service', () => {
     })
     expect(
       database.connection.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()
-    ).toEqual({ count: 2 })
+    ).toEqual({ count: 3 })
   })
 
   it('returns only active due items in schedule order', () => {

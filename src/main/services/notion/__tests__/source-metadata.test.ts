@@ -31,6 +31,9 @@ describe('Notion Source Metadata Service', () => {
         if (target.includes('00000000000000000000000000000dbd')) {
           return { targetId: 'resolved-target-32', targetType: 'data_source' }
         }
+        if (target.includes('00000000000000000000000000000db2')) {
+          throw { status: 400, message: 'MULTIPLE_DATA_SOURCES_FOUND' }
+        }
         return { targetId: target, targetType: 'data_source' }
       })
     }
@@ -103,6 +106,12 @@ describe('Notion Source Metadata Service', () => {
       const result = await service.resolveTarget({ target: '00000000000000000000000000000dbd' })
       expect(result.targetId).toBe('resolved-target-32')
       expect(result.targetType).toBe('data_source')
+    })
+
+    it('여러 개의 데이터 소스가 감지되면 MULTIPLE_DATA_SOURCES_FOUND 에러를 반환합니다.', async () => {
+      await expect(
+        service.resolveTarget({ target: '00000000000000000000000000000db2' })
+      ).rejects.toThrow('MULTIPLE_DATA_SOURCES_FOUND')
     })
   })
 

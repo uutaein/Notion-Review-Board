@@ -45,7 +45,8 @@ function sanitizeIpcError(err: unknown): Error {
     'INVALID_TAG_FILTER',
     'INVALID_CHECKBOX_MAPPING',
     'INVALID_TARGET',
-    'SYSTEM_SOURCE_PROTECTED'
+    'SYSTEM_SOURCE_PROTECTED',
+    'MULTIPLE_DATA_SOURCES_FOUND'
   ]
 
   const originalMessage = err instanceof Error ? err.message : ''

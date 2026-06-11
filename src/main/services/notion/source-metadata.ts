@@ -136,7 +136,8 @@ export function createNotionSourceMetadataService(dependencies: {
       message === 'FORBIDDEN' ||
       message === 'NOT_FOUND' ||
       message === 'RATE_LIMITED' ||
-      message === 'DUPLICATE_TARGET'
+      message === 'DUPLICATE_TARGET' ||
+      message === 'MULTIPLE_DATA_SOURCES_FOUND'
     ) {
       throw err
     }
@@ -481,7 +482,11 @@ export class ProductionNotionTargetResolver implements NotionTargetResolver {
 
     if (dbResponse.ok) {
       const dbData = (await dbResponse.json()) as { data_sources?: { id: string }[] }
-      const dsId = dbData.data_sources?.[0]?.id
+      const dataSources = dbData.data_sources || []
+      if (dataSources.length > 1) {
+        throw { status: 400, message: 'MULTIPLE_DATA_SOURCES_FOUND' }
+      }
+      const dsId = dataSources[0]?.id
       if (dsId) {
         return { targetId: normalizeNotionTargetId(dsId), targetType: 'data_source' }
       }
@@ -575,36 +580,9 @@ export class ProductionNotionMetadataClient implements NotionMetadataClient {
       return null
     }
 
-    if (response.status !== 404) {
-      throw {
-        status: response.status,
-        message: `Data source query error ${response.status}`
-      }
-    }
-
-    // 단독 페이지(data_source)인 경우 해당 페이지 정보를 가져옵니다 (404 불일치 시에만 fallback).
-    const pageResp = await fetch(`https://api.notion.com/v1/pages/${targetId}`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Notion-Version': '2026-03-11'
-      },
-      signal: AbortSignal.timeout(10000)
-    })
-
-    if (pageResp.ok) {
-      const result = (await pageResp.json()) as any
-      return {
-        id: result.id,
-        url: result.url,
-        properties: result.properties,
-        last_edited_time: result.last_edited_time
-      }
-    }
-
     throw {
-      status: pageResp.status,
-      message: `Failed to fetch sample page ${pageResp.status}`
+      status: response.status,
+      message: `Data source query error ${response.status}`
     }
   }
 }

@@ -40,6 +40,7 @@ export interface ReviewSource {
   lastSyncedAt: DateTimeString | null
   createdAt: DateTimeString
   updatedAt: DateTimeString
+  deletedAt?: DateTimeString | null
 }
 
 /**

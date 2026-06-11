@@ -92,6 +92,47 @@ const migrations: Migration[] = [
     up: `
       ALTER TABLE review_sources ADD COLUMN last_edited_property_name TEXT;
     `
+  },
+  {
+    version: 3,
+    up: `
+      -- 1. review_sources 테이블에 deleted_at 컬럼 추가 (soft delete 지원)
+      ALTER TABLE review_sources ADD COLUMN deleted_at TEXT;
+
+      -- 2. review_items 테이블의 CHECK 제약조건에 'orphaned' 추가를 위한 리테이블링
+      CREATE TABLE review_items_new (
+        id TEXT PRIMARY KEY,
+        notion_page_id TEXT NOT NULL UNIQUE,
+        notion_url TEXT NOT NULL,
+        title TEXT NOT NULL,
+        primary_source_id TEXT NOT NULL REFERENCES review_sources(id),
+        source_ids_json TEXT NOT NULL,
+        due_at TEXT NOT NULL,
+        fsrs_state_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('active', 'changed', 'missing', 'deleted', 'sync_error', 'archived', 'orphaned')),
+        category TEXT,
+        tags_json TEXT NOT NULL,
+        origin_label TEXT,
+        last_reviewed_at TEXT,
+        notion_last_edited_at TEXT,
+        last_synced_at TEXT,
+        missing_detected_at TEXT,
+        deleted_detected_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- 데이터 이전
+      INSERT INTO review_items_new SELECT * FROM review_items;
+
+      -- 기존 테이블 및 인덱스 드롭
+      DROP INDEX IF EXISTS idx_review_items_due_at;
+      DROP TABLE review_items;
+
+      -- 새 테이블 이름 변경 및 인덱스 재생성
+      ALTER TABLE review_items_new RENAME TO review_items;
+      CREATE INDEX idx_review_items_due_at ON review_items(status, due_at);
+    `
   }
 ]
 
@@ -103,22 +144,30 @@ export function runMigrations(database: Database.Database): void {
     )
   `)
 
-  const appliedVersions = new Set(
-    database
-      .prepare('SELECT version FROM schema_migrations')
-      .all()
-      .map((row) => (row as { version: number }).version)
-  )
-  const applyMigration = database.transaction((migration: Migration) => {
-    database.exec(migration.up)
-    database
-      .prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)')
-      .run(migration.version, new Date().toISOString())
-  })
+  // 마이그레이션 도중 외래 키 제약 조건 비활성화 (테이블 리팩토링 시 필요)
+  database.pragma('foreign_keys = OFF')
 
-  for (const migration of migrations) {
-    if (!appliedVersions.has(migration.version)) {
-      applyMigration(migration)
+  try {
+    const appliedVersions = new Set(
+      database
+        .prepare('SELECT version FROM schema_migrations')
+        .all()
+        .map((row) => (row as { version: number }).version)
+    )
+    const applyMigration = database.transaction((migration: Migration) => {
+      database.exec(migration.up)
+      database
+        .prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)')
+        .run(migration.version, new Date().toISOString())
+    })
+
+    for (const migration of migrations) {
+      if (!appliedVersions.has(migration.version)) {
+        applyMigration(migration)
+      }
     }
+  } finally {
+    // 마이그레이션 완료 후 외래 키 제약 조건 활성화
+    database.pragma('foreign_keys = ON')
   }
 }
