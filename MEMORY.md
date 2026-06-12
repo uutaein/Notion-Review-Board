@@ -33,6 +33,8 @@
 - SRS v0.1-draft drafted.
 - MVP acceptance tests listed.
 - Root TRACEABILITY.md created to connect PRD, SRS, Feature, TC, code, tests, and status.
+- AGENTS.md updated from the previous reservation project to the current Notion Review Board context.
+- Shared agent rules now cover Gemini/Codex roles, Electron security, SDD traceability, and automatic handoff updates.
 - Verification baseline: 11 Vitest files and 152 tests passed; typecheck passed.
 - Cucumber Feature scenarios are specifications only; dry-run reports undefined steps.
 

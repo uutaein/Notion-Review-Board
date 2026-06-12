@@ -2,52 +2,90 @@
 
 ## 0. Identity
 
-You are an AI coding agent working on the **SDD 기반 회의실 예약 시스템**.
+You are an AI agent working on **Notion Review Board**.
 
-Your job is not to “just code.”
-Your job is to preserve the project’s specification, protect existing behavior, and implement the smallest safe change that satisfies the current task.
+This project is an Electron desktop application that turns Notion pages into document-level review
+items and schedules reviews with FSRS.
+
+Your job is not to generate as much code as possible. Your job is to preserve the specification,
+protect existing behavior, and make the smallest safe change that satisfies the current task.
 
 > Truth first.
+> Existing specification first.
 > Existing code first.
 > Small change first.
 > Green test first.
-> No invented API, no invented DTO, no invented policy.
+> No invented API, DTO, schema, policy, or status.
 
 ---
 
-## 1. Project Summary
+## 1. Project Context
 
-This project is a meeting-room reservation system built with an SDD-style workflow.
+Current product direction:
 
-Current known functional status:
+- Product: Notion Review Board
+- Runtime: Electron Desktop
+- Primary platform: Windows
+- Renderer: Vue 3 and TypeScript
+- Storage: SQLite through `better-sqlite3`
+- Review engine: FSRS through `ts-fsrs`
+- External system: Notion API
+- Default timezone: Asia/Seoul
 
-* Reservation create: implemented
-* Reservation list/read: implemented
-* Reservation cancel/delete: implemented
-* Reservation update backend: implemented
-* Reservation update backend BDD: Green
-* Reservation update frontend: in progress
-* `ReservationDashboard.vue` became large and is being split into smaller Vue components
-
-Current working branch context:
-
-```text
-feature/vue-reservation-update
-```
-
-Current frontend goal:
+Core project directories:
 
 ```text
-Add and stabilize reservation update UI.
+docs/                 PRD, SRS, ADR, and test cases
+feature/              Gherkin Feature specifications
+src/main/             Electron Main Process
+src/main/services/    Notion, SQLite, Source, Review, and Scheduler services
+src/main/ipc/         Privileged IPC handlers and validation
+src/preload/          Restricted renderer bridge
+src/renderer/         Vue renderer
+src/shared/domain/    Shared domain types and pure rules
 ```
+
+Current scope, completed work, open questions, and next action must be read from:
+
+```text
+MEMORY.md
+TRACEABILITY.md
+```
+
+Do not copy a temporary branch state into this file. Keep changing project status in `MEMORY.md`.
 
 ---
 
-## 2. Core Operating Rules
+## 2. Agent Coordination
 
-### 2.1 Do not assume. Read first.
+The current collaboration model is:
 
-Before changing code, inspect the relevant files.
+- Gemini: primary implementation agent
+- Codex: specification, test design, review, and verification agent
+- Both agents: follow this file and preserve project traceability
+
+This division is a default, not permission to ignore defects. If an agent changes code, that agent
+must still run relevant checks and report failures. If Codex is explicitly asked to implement, it
+may implement the smallest safe change.
+
+At the end of meaningful work, update `MEMORY.md` without waiting for an explicit request. Record
+only confirmed facts useful to the next agent:
+
+- completed work
+- verification results
+- next action
+- open questions
+- known risks
+- regression scope changes
+
+Update `TRACEABILITY.md` when PRD, SRS, Feature, TC, implementation evidence, or verification status
+changes.
+
+---
+
+## 3. Core Operating Rules
+
+### 3.1 Read before changing
 
 Minimum first actions:
 
@@ -57,598 +95,247 @@ git branch --show-current
 git diff --stat
 ```
 
-Then inspect project scripts:
-
-```bash
-cat package.json
-```
-
-Do not invent commands.
-Use only scripts that actually exist in `package.json`.
-
----
-
-### 2.2 Do not overbuild.
-
-This is a small SDD learning project.
-Do not introduce large architectural changes unless explicitly requested.
-
-Avoid:
-
-* State management libraries
-* Router restructuring
-* New UI frameworks
-* New test frameworks
-* New validation libraries
-* New build tools
-* Large CSS redesigns
-* Unrequested backend changes
-
-Prefer:
-
-* Existing patterns
-* Existing API helpers
-* Existing component style
-* Existing naming
-* Existing error handling
-* Existing CSS classes
-
----
-
-### 2.3 Preserve behavior before adding behavior.
-
-Before and after changes, check that these still work:
+Then inspect:
 
 ```text
-1. Reservation list
-2. Reservation create
-3. Reservation cancel
-4. Reservation update
+package.json
+MEMORY.md
+TRACEABILITY.md
+relevant PRD/SRS sections
+relevant Feature file
+relevant TC document
+relevant implementation and tests
 ```
 
-New functionality must not break old functionality.
+Use only scripts that exist in `package.json`. Do not invent commands.
 
----
+### 3.2 Do not assume
 
-### 2.4 If uncertain, stop and report.
-
-When you cannot confirm something from code, do not guess.
-
-Say clearly:
-
-```text
-I could not confirm the API path from the code.
-I found these related files.
-I need to inspect the backend controller or existing API module before editing.
-```
+Confirm behavior from the repository before making a claim.
 
 Do not fabricate:
 
-* API path
-* DTO shape
-* response body
-* error message format
-* room policy
-* room capacity
-* date format
-* test command
+- Notion API routes, versions, response shapes, or retry policy
+- IPC channel names or preload methods
+- SQLite schema, migration behavior, or transaction boundaries
+- FSRS state shape, version, or serialization
+- DTOs, error codes, status values, or UI messages
+- test coverage or passing status
+- deletion, missing-page, or source ownership policy
+
+If a fact cannot be confirmed, state what was inspected and what remains unknown.
+
+### 3.3 Make the smallest safe change
+
+Avoid unless explicitly requested:
+
+- new frameworks or dependencies
+- state-management libraries
+- router or build-tool restructuring
+- broad renderer redesigns
+- unrelated refactors
+- schema changes without migrations
+- generic IPC or unrestricted Electron APIs
+- replacing existing test frameworks
+
+Prefer existing patterns, boundaries, naming, error handling, and public contracts.
+
+### 3.4 Preserve existing behavior
+
+Changes must not silently break:
+
+```text
+1. Notion token storage and connection verification
+2. Review Source CRUD and field mapping
+3. Synchronization contracts
+4. Today Review eligibility and ordering
+5. Review rating and FSRS scheduling
+6. Review Log preservation
+7. Electron security boundaries
+```
+
+Run focused tests first, then the relevant regression suite.
 
 ---
 
-## 3. Agent Behavior Style
+## 4. Specification-Driven Workflow
 
-Use a direct, practical, strict style.
-
-The preferred working attitude:
+The traceability chain is:
 
 ```text
-확인한다.
-작게 바꾼다.
-깨진 걸 숨기지 않는다.
-기존 기능을 먼저 지킨다.
-불확실하면 멈춘다.
+PRD -> SRS -> Feature -> TC -> Code/Test -> Status
 ```
 
-Do not produce vague reassurance such as:
+Primary documents:
 
 ```text
-Looks good overall.
-Should be fine.
-Probably works.
+docs/notion-review-board-prd-v0.1.md
+docs/notion-review-board-srs-v0.1.md
+feature/**/*.feature
+docs/test-cases/*.md
+TRACEABILITY.md
 ```
 
-Instead, report concrete evidence:
+Before changing behavior:
 
-```text
-I verified the update modal opens.
-I verified the selected reservation ID is passed.
-I verified the update request uses reservation.id.
-I verified list reload is called after success.
-```
+1. Identify the governing SRS ID.
+2. Read the matching Feature scenarios.
+3. Read existing TC coverage.
+4. Inspect the implementation and tests.
+5. Resolve contradictions before coding.
+6. Add or update tests with the implementation.
+7. Update traceability and handoff state.
+
+Feature files currently act as specifications. Do not call them executable or Green merely because
+`npm run test:features:dry` completes. Until step definitions exist, undefined Cucumber steps are not
+verification evidence.
+
+Do not change implementation to satisfy a TC that contradicts the SRS. Report the contradiction and
+fix the specification chain first.
 
 ---
 
-## 4. SDD Workflow
+## 5. Domain Rules
 
-This project follows a lightweight SDD workflow.
+Preserve these confirmed product decisions:
 
-### Backend workflow
+1. A Notion Page is the review unit.
+2. A Notion Database or Data Source is a Review Source.
+3. Multiple Sources may reference the same Notion Page.
+4. Review Logs are preserved by default.
+5. Notion page changes do not automatically alter `dueAt`.
+6. Missing pages are not immediately treated as deleted.
+7. Only eligible active items belong in Today Review.
+8. Review rating updates scheduling state and Review Log atomically.
+9. FSRS state is versioned and JSON-serializable.
+10. Backend/Main Process validation remains authoritative.
 
-Backend features should generally follow:
+Open policies are listed as `SRS-OPEN-*` in the SRS and `MEMORY.md`. Do not silently resolve an open
+policy in code.
 
-```text
-Feature
-→ Step Definition
-→ Repository
-→ Service
-→ Controller
-→ BDD Green
-```
-
-Backend work should be guided by:
-
-```text
-features/*.feature
-features/step_definitions/*.steps.js
-```
-
-Do not modify backend behavior without checking existing feature files.
+Use actual domain fields and types from `src/shared/domain`. Do not rename or duplicate them casually.
 
 ---
 
-### Frontend workflow
+## 6. Electron and Security Boundaries
 
-Frontend uses a lighter SDD approach.
+Security requirements are product requirements, not optional hardening.
 
-Frontend feature files may act as specification documents even if no Cucumber step is written.
+Always preserve:
 
-Frontend flow:
+- Notion tokens remain in the Main Process.
+- Tokens never appear in renderer responses, logs, errors, Sync Events, or plaintext SQLite fields.
+- Renderer code does not access Node.js, filesystem, SQLite, or raw Electron APIs directly.
+- Preload exposes only narrow, intent-specific methods.
+- IPC validates the sender before privileged service access.
+- IPC validates exact payload shape, types, enums, lengths, and unexpected fields.
+- Renderer-facing errors use stable sanitized codes/messages without stack traces or raw Notion
+  responses.
+- Remote Notion content does not receive Node.js or application Electron APIs.
+- External URLs are validated in the Main Process against explicit protocol and host rules.
+- `webSecurity` must not be disabled to bypass integration problems.
 
-```text
-Feature/spec 확인
-→ existing Vue structure 확인
-→ minimal component change
-→ browser/manual verification
-→ API integration
-→ regression check
-```
-
-For frontend work, Cucumber step definitions are not mandatory unless the project already uses them for that frontend feature.
-
----
-
-## 5. Current Reservation Domain Rules
-
-This is not a generic CRUD app.
-Reservation logic has domain constraints.
-
-Always consider:
-
-```text
-1. Date is required.
-2. Start time is required.
-3. End time is required.
-4. End time must be after start time.
-5. Room ID must exist.
-6. Attendee count must be positive.
-7. Attendee count must not exceed room capacity.
-8. Same room cannot have overlapping reservations.
-9. Update must preserve reservation ID.
-10. Updating a reservation must not conflict with another reservation.
-11. Backend is the source of truth for conflict validation.
-12. Frontend must display backend failure clearly.
-```
-
-Do not claim that a reservation is possible unless the backend or reservation system confirms it.
+Never add a generic `send`, `invoke`, filesystem, database, token-read, or unrestricted Notion bridge.
 
 ---
 
-## 6. Known Reservation Fields
+## 7. Storage and Scheduling Safety
 
-Use the actual fields already present in code.
-Known fields from the current project context:
+### SQLite
 
-```text
-id
-roomId
-reservationDate
-startTime
-endTime
-ownerName
-attendees
-purpose
-```
+- Use existing repositories and `DatabaseService` boundaries.
+- Add a versioned migration for schema changes.
+- Preserve transaction boundaries for multi-record updates.
+- Do not delete Review Logs as an implicit side effect.
+- Keep duplicate protection in both service validation and database constraints where applicable.
+- Use ISO 8601 UTC strings for persisted timestamps unless the existing contract says otherwise.
 
-Important field rules:
+### FSRS
 
-```text
-id              = reservation identifier, required for update
-roomId          = actual room ID, not display name
-reservationDate = date string expected by backend
-startTime       = start time string expected by backend
-endTime         = end time string expected by backend
-ownerName       = reservation owner name
-attendees       = number, not string
-purpose         = meeting purpose
-```
+- Access `ts-fsrs` through the existing adapter.
+- Do not persist library class instances.
+- Preserve versioned JSON state and before/after snapshots.
+- Do not mutate persisted input state during calculation.
+- Calculation or persistence failure must not report success or leave partial updates.
 
-Do not rename fields unless the existing code already does so.
+### Notion
 
-Watch out for these mistakes:
-
-```text
-reservation.date vs reservation.reservationDate
-attendeeCount vs attendees
-roomName vs roomId
-owner vs ownerName
-```
-
-If there is a mismatch, inspect the backend DTO and existing frontend code before editing.
+- Keep Notion transport and response mapping behind existing service interfaces.
+- Preserve Database/Data Source normalization in the dedicated resolver.
+- Distinguish authentication, permission, not-found, rate-limit, and network failures.
+- Do not interpret temporary API failure as page deletion.
+- Metadata discovery and mapping preview must remain read-only.
 
 ---
 
-## 7. Current Frontend Component Direction
+## 8. Testing and Verification
 
-`ReservationDashboard.vue` should not keep growing indefinitely.
-
-Preferred component split:
-
-```text
-src/
-  components/
-    ReservationFilter.vue
-    ReservationDayList.vue
-    ReservationCreateModal.vue
-    ReservationUpdateModal.vue
-  views/
-    ReservationDashboard.vue
-```
-
-Role boundaries:
-
-### `ReservationDashboard.vue`
-
-Owns page-level state and orchestration.
-
-Responsible for:
-
-```text
-- baseDate
-- businessDayCount
-- dailyReservations
-- loading
-- submitting
-- successMessage
-- errorMessage
-- create modal open/close
-- update modal open/close
-- API calls
-- list reload
-```
-
-Should not contain large form markup if modal components exist.
-
----
-
-### `ReservationFilter.vue`
-
-Responsible for:
-
-```text
-- base date input
-- business day count select
-- emitting filter changes
-```
-
-Should not call reservation APIs directly unless the existing pattern already does that.
-
----
-
-### `ReservationDayList.vue`
-
-Responsible for:
-
-```text
-- rendering daily reservation cards
-- rendering reservation rows
-- showing room name
-- emitting update click
-- emitting cancel click
-```
-
-Should emit events like:
-
-```text
-update
-cancel
-```
-
-Do not perform API mutation inside the list component unless existing code already follows that pattern.
-
----
-
-### `ReservationCreateModal.vue`
-
-Responsible for:
-
-```text
-- create reservation form
-- local form input binding
-- submit event
-- close event
-- form error display if passed as prop
-```
-
-Should not own global list reload logic.
-
----
-
-### `ReservationUpdateModal.vue`
-
-Responsible for:
-
-```text
-- update reservation form
-- prefilled selected reservation data
-- submit event
-- close event
-- update error display if passed as prop
-```
-
-Should not directly mutate the reservation list unless the current architecture already does that.
-
----
-
-## 8. Reservation Update Frontend Requirements
-
-The update frontend is complete only when all of these are true:
-
-```text
-1. Each reservation row has an update button.
-2. Clicking update opens the update modal.
-3. The selected reservation ID is preserved.
-4. Existing reservation data is prefilled.
-5. The user can edit room, date, time, attendees, owner, and purpose if supported.
-6. Clicking save sends an update request using the selected reservation ID.
-7. On success, the modal closes.
-8. On success, the reservation list reloads.
-9. On failure, the modal stays open.
-10. On failure, an error message is displayed.
-11. Create, list, and cancel still work.
-```
-
----
-
-## 9. Update Button Style
-
-Existing cancel button style:
-
-```css
-.cancel-button {
-  border: 1px solid #dc2626;
-  background: #fff;
-  color: #dc2626;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 13px;
-  cursor: pointer;
-}
-```
-
-Preferred update button style:
-
-```css
-.update-button {
-  border: 1px solid #2563eb;
-  background: #fff;
-  color: #2563eb;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 13px;
-  cursor: pointer;
-  margin-right: 6px;
-}
-```
-
-Do not reuse `cancel-button` for update behavior.
-
----
-
-## 10. Modal Placement Rule
-
-Modal markup should not be placed inside:
-
-```text
-table
-thead
-tbody
-tr
-td
-v-for reservation row
-v-for day card
-```
-
-Preferred placement:
-
-```text
-At the page-level container, near the existing create modal,
-usually before the closing </main>.
-```
-
-Reason:
-
-```text
-Modals are page-level overlays.
-Putting them inside table/list structure can break layout and DOM semantics.
-```
-
----
-
-## 11. API Integration Rules
-
-Before adding or changing API calls, inspect existing API code.
-
-Search for existing patterns:
+Available project checks are defined in `package.json`. Typical checks include:
 
 ```bash
-grep -R "fetch(" -n src
-grep -R "axios" -n src
-grep -R "reservations" -n src
+npm test
+npm run typecheck
+npm run lint
+npm run format:check
+npm run build
+npm run test:features:dry
 ```
 
-Use existing style.
+Choose checks based on the change:
 
-Do not switch from `fetch` to `axios` or from `axios` to `fetch` unless requested.
+- Documentation only: `npm run format:check` or focused Prettier check
+- Domain/service change: focused Vitest plus `npm test` and `npm run typecheck`
+- IPC/preload change: IPC tests, security regression tests, `npm test`, and `npm run typecheck`
+- Renderer change: typecheck, relevant tests, build, and browser/manual verification when possible
+- Schema change: migration and database integration tests
+- Feature/TC change: validate IDs and update `TRACEABILITY.md`
 
-Update API must:
+Report the exact command and result. Distinguish:
 
-```text
-- use the existing backend route
-- send the DTO shape expected by backend
-- use reservation.id in the path or payload as backend expects
-- preserve backend validation
-- surface backend errors to the UI
-```
+- automated test passed
+- typecheck/build passed
+- manual behavior verified
+- not run
+- blocked
+- Cucumber step undefined
 
-Do not silently swallow errors.
-
-Bad:
-
-```js
-catch (e) {
-  console.log(e)
-}
-```
-
-Better:
-
-```js
-catch (error) {
-  updateErrorMessage.value = error.message || '예약 수정에 실패했습니다.'
-}
-```
+Never report a feature as verified from code inspection alone.
 
 ---
 
-## 12. Error Handling Rules
+## 9. Change Guardrails
 
-Backend validation errors are meaningful.
+Before editing:
 
-Frontend should display errors for:
+1. Identify exact target files.
+2. State the intended change.
+3. Check for unrelated user changes.
+4. Confirm the specification and public contract.
 
-```text
-- time overlap
-- room capacity exceeded
-- invalid time range
-- missing required field
-- reservation not found
-- server/network failure
-```
+While editing:
 
-Do not replace all errors with a vague message if backend gives a useful one.
+- Do not modify unrelated files.
+- Do not revert user changes.
+- Do not weaken validation or security to make a test pass.
+- Do not hide failing tests.
+- Do not combine speculative cleanup with a feature fix.
+- Keep comments focused on non-obvious decisions.
 
-Preferred fallback:
+Stop and report when:
 
-```text
-예약 수정에 실패했습니다.
-```
-
-But if backend returns a specific message, show it.
-
----
-
-## 13. Verification Cases
-
-After implementing update UI, verify these manually at minimum.
-
-### 13.1 Normal update
-
-```text
-Change purpose only.
-Save.
-Modal closes.
-List reloads.
-Changed purpose appears.
-```
-
-### 13.2 Time update
-
-```text
-Change start/end time.
-Save.
-List reloads.
-Changed time appears.
-```
-
-### 13.3 Room update
-
-```text
-Change room.
-Save.
-List reloads.
-Room display changes.
-```
-
-### 13.4 Attendee update
-
-```text
-Change attendee count.
-Save.
-List reloads.
-Attendee count changes.
-```
-
-### 13.5 Conflict update
-
-```text
-Change reservation to overlap another reservation in the same room.
-Save.
-Backend rejects.
-Modal remains open.
-Error message appears.
-```
-
-### 13.6 Capacity exceeded
-
-```text
-Set attendees above room capacity.
-Save.
-Backend rejects.
-Modal remains open.
-Error message appears.
-```
-
-### 13.7 Regression
-
-```text
-List still loads.
-Create still works.
-Cancel still works.
-Filter still works.
-```
+- SRS, Feature, TC, and code contradict each other.
+- an API or DTO contract cannot be confirmed.
+- a required policy is still open.
+- baseline tests fail before the change.
+- the diff becomes unexpectedly broad.
+- generated changes touch unrelated areas.
+- a security boundary would need to be weakened.
 
 ---
 
-## 14. Git Discipline
+## 10. Git Discipline
 
-Separate refactor and feature changes when possible.
-
-Preferred commits:
-
-```bash
-git commit -m "refactor: split reservation dashboard components"
-git commit -m "feat: add reservation update modal"
-git commit -m "feat: connect reservation update api"
-git commit -m "fix: handle reservation update errors"
-```
-
-Avoid mixed commits like:
-
-```text
-refactor + API integration + style + bug fix + test change
-```
-
-Before commit:
+Before committing:
 
 ```bash
 git status
@@ -656,55 +343,23 @@ git diff --stat
 git diff
 ```
 
-If the diff is too large, stop and summarize before continuing.
+Keep commits focused. Prefer separate commits for:
+
+```text
+spec/test changes
+implementation
+refactor
+bug fix
+documentation and traceability
+```
+
+Do not amend, force-push, reset, or discard changes unless explicitly requested.
 
 ---
 
-## 15. Instant Mode Guardrails
+## 11. Reporting Format
 
-When running in fast or instant mode, follow these strict limits.
-
-### Do first
-
-```text
-1. Inspect files.
-2. Identify exact target files.
-3. State the intended change.
-4. Make the smallest change.
-5. Run available checks.
-6. Summarize changed files and verification result.
-```
-
-### Do not do
-
-```text
-- Do not implement extra features.
-- Do not redesign the page.
-- Do not change unrelated files.
-- Do not modify backend when asked for frontend.
-- Do not add dependencies.
-- Do not rename fields casually.
-- Do not delete working code unless replacing it with verified equivalent code.
-```
-
-### Stop conditions
-
-Stop and ask or report if:
-
-```text
-- API route cannot be confirmed.
-- DTO field names conflict.
-- Existing tests fail before your change.
-- package scripts are missing.
-- diff becomes unexpectedly large.
-- generated code touches unrelated areas.
-```
-
----
-
-## 16. Response Format for Agent
-
-When reporting back, use this structure:
+Use this structure:
 
 ```text
 Summary
@@ -715,158 +370,52 @@ Files changed
 - file 2
 
 Verification
-- command run
-- result
+- command: result
 
 Risks / notes
-- remaining issue if any
+- remaining issue or unverified scope
 
 Next step
 - one concrete next action
 ```
 
-Do not give a vague completion report.
+Use evidence, not reassurance.
 
 Bad:
 
 ```text
-Done. Everything should work.
+Everything should work.
 ```
 
 Good:
 
 ```text
-Summary
-- Split ReservationDashboard modal markup into ReservationUpdateModal.
-- Connected update submit to existing updateReservation API.
-
-Files changed
-- src/views/ReservationDashboard.vue
-- src/components/ReservationUpdateModal.vue
-
-Verification
-- npm run build: passed
-- manual browser check: update modal opens and selected ID is preserved
-
-Risks / notes
-- Conflict error display still needs manual backend validation.
-
-Next step
-- Test overlap update case in browser.
+npm test passed: 11 files, 152 tests.
+Cucumber scenarios remain undefined because no step definitions exist.
+Renderer UI behavior was not manually verified.
 ```
 
 ---
 
-## 17. Backend Safety Notes
+## 12. Project Philosophy
 
-Backend update is already implemented and BDD Green according to project context.
-
-Do not rewrite backend update logic unless explicitly requested.
-
-If backend must be touched, first inspect:
+This project practices practical SDD and AI-assisted development:
 
 ```text
-features/*update*.feature
-features/step_definitions/*update*.steps.js
-src/**/ReservationController*
-src/**/ReservationService*
-src/**/ReservationRepository*
+1. Human defines product intent.
+2. Agents inspect specification and code.
+3. Tests make the intended contract explicit.
+4. Implementation stays small and reversible.
+5. Verification produces concrete evidence.
+6. MEMORY.md hands confirmed state to the next agent.
+7. TRACEABILITY.md preserves the requirement chain.
 ```
 
-Backend update must preserve:
-
-```text
-- self reservation excluded from overlap check
-- conflict detection with other reservations
-- room capacity validation
-- not-found handling
-- existing create/list/cancel behavior
-```
-
----
-
-## 18. Frontend Safety Notes
-
-Frontend update should rely on backend validation.
-
-Frontend may use basic HTML constraints:
-
-```text
-required
-min
-max
-type="date"
-type="time"
-type="number"
-```
-
-But frontend must not be treated as the final validator.
-
-Backend remains the source of truth.
-
----
-
-## 19. Naming Preference
-
-Use clear names.
-
-Preferred:
-
-```text
-isCreateModalOpen
-isUpdateModalOpen
-createForm
-updateForm
-formErrorMessage
-updateErrorMessage
-openCreateModal
-closeCreateModal
-openUpdateModal
-closeUpdateModal
-submitReservation
-submitUpdateReservation
-handleCancelReservation
-loadReservations
-```
-
-Avoid ambiguous names:
-
-```text
-modal
-data
-item
-value
-temp
-doUpdate
-save
-```
-
----
-
-## 20. Project Philosophy
-
-This project is being used to practice practical SDD and AI-assisted development.
-
-The point is not to let the agent generate a large amount of code.
-
-The point is:
-
-```text
-1. Human defines the spec.
-2. Agent reads the code.
-3. Agent makes a small change.
-4. Human verifies behavior.
-5. Tests and feature files preserve intent.
-```
-
-A good agent in this project behaves like a careful senior engineer, not like an overeager code generator.
-
----
-
-## 21. Final Rule
+## 13. Final Rule
 
 > Do not be clever.
 > Be correct.
 > Be small.
 > Be reversible.
-> Keep the reservation system working.
+> Preserve security and review history.
+> Leave verified evidence for the next agent.
