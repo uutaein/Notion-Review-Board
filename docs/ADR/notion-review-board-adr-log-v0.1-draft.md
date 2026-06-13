@@ -31,6 +31,7 @@
 | ADR-012 | 복습 평가는 버튼 기반 4단계 평가를 필수 UX로 채택 | Accepted |
 | ADR-013 | Notion 페이지 본문 전체를 저장하지 않는 메타데이터 저장 정책 채택 | Accepted |
 | ADR-014 | Main Process 중심의 Notion/SQLite/보안 경계 유지 | Accepted |
+| ADR-015 | Review Source 식별과 삭제 정책을 명시적으로 고정 | Accepted |
 
 ---
 
@@ -759,6 +760,114 @@ Preload는 최소 API만 contextBridge로 노출하고, 모든 IPC 요청은 sen
 
 ---
 
+## ADR-015 — Review Source 식별과 삭제 정책을 명시적으로 고정
+
+### 상태
+
+Accepted
+
+### 결정일
+
+2026-06-12
+
+### 맥락
+
+Review Source와 필드 매핑 구현이 SRS보다 먼저 구체화되면서 다음 정책이 불명확해졌다.
+
+1. Database 입력에서 여러 Data Source가 발견될 때의 처리
+2. 동일한 normalized Notion Target의 중복 등록 허용 여부
+3. Source 삭제 시 단독 참조 Review Item의 처리 선택지
+4. Source가 없는 Item을 위한 `orphaned` 상태 사용 여부
+5. 삭제된 Source를 대신하는 `system-deleted` sentinel Source 사용 여부
+6. Source 삭제 시 Review Log 완전 삭제 허용 여부
+
+### 결정
+
+#### Notion Target 해석
+
+1. 사용자는 Database 또는 Data Source URL/ID를 입력할 수 있다.
+2. 내부에서는 Data Source를 우선 사용한다.
+3. Database 입력이 정확히 하나의 Data Source로 해석되면 해당 Data Source로 정규화한다.
+4. 여러 Data Source가 발견되면 자동 선택하지 않고 등록을 거부한다.
+5. 사용자는 등록할 Data Source URL/ID를 직접 입력해야 한다.
+6. 기존 Database Query API fallback은 MVP 등록 경로로 사용하지 않는다.
+
+#### Source 중복
+
+1. 활성 Source의 normalized `notionTargetId`는 유일해야 한다.
+2. 동일 Target의 중복 등록은 경고와 함께 거부한다.
+3. 강제 등록 옵션은 제공하지 않는다.
+4. 삭제된 Source와 같은 Target은 기존 삭제 처리가 완료된 후 다시 등록할 수 있다.
+
+#### Source 삭제
+
+Source 삭제 전에 단독 참조 Item과 공유 Item의 영향 범위를 표시한다. 단독 참조
+Review Item에는 다음 세 정책을 모두 제공한다.
+
+| 정책 | Review Item 처리 | Review Log 처리 |
+| --- | --- | --- |
+| `archive` | 전체 메타데이터를 유지하고 `archived`로 전환 | 항상 보존 |
+| `delete` | 최소 식별 메타데이터를 가진 `deleted` tombstone으로 전환 | 항상 보존 |
+| `keep-history` | 운영 Review Item은 제거하고 Review Log snapshot만 유지 | 항상 보존 |
+
+공유 Item은 삭제한 Source 참조만 제거하고 다른 Source 참조와 Review Item을 유지한다.
+
+#### 상태와 참조 모델
+
+1. `orphaned`는 공식 ReviewItem 상태로 사용하지 않는다.
+2. `system-deleted` sentinel Source를 만들지 않는다.
+3. 활성 Source가 없는 `archived` 또는 `deleted` Item은 `primarySourceId = null`,
+   `sourceIds = []`를 허용한다.
+4. Review Log의 평가 당시 Source 정보는 삭제 가능한 Source FK에만 의존하지 않고
+   immutable snapshot으로 보존한다.
+5. `keep-history`로 Review Item을 제거해도 Review Log가 유지되도록 Review Log와 Item의
+   삭제 결합을 해제한다.
+6. Source 삭제는 Source, Item 참조, tombstone 또는 history 전환을 하나의 transaction으로
+   처리한다.
+
+#### Review Log
+
+1. MVP에서는 Source 삭제를 이유로 Review Log를 완전 삭제할 수 없다.
+2. `archive`, `delete`, `keep-history` 모두 기존 Review Log를 보존한다.
+3. 완전 삭제 기능은 별도 개인정보/데이터 삭제 정책과 ADR 없이 추가하지 않는다.
+
+### 근거
+
+1. 여러 Data Source 중 첫 항목 자동 선택은 사용자가 의도하지 않은 데이터를 수집할 수 있다.
+2. 동일 Target 중복 Source는 동기화, 삭제 영향, 필드 매핑의 책임을 불필요하게 중복시킨다.
+3. 세 삭제 정책은 사용자가 Item 메타데이터 보존 수준을 명시적으로 선택하게 한다.
+4. `orphaned`와 `system-deleted`는 현재 SRS에 없는 숨은 도메인 개념이며 상태 전이와 UI를
+   복잡하게 만든다.
+5. Review Log는 제품의 복습 이력이며 Source 생명주기보다 오래 유지되어야 한다.
+
+### 결과
+
+긍정적 결과:
+
+1. Source 등록과 삭제 동작이 사용자에게 예측 가능해진다.
+2. 숨겨진 sentinel Source 없이 도메인 모델을 설명할 수 있다.
+3. Review Log 보존 원칙이 모든 삭제 정책에서 일관된다.
+4. Database/Data Source 오선택 가능성을 제거한다.
+
+부정적 결과:
+
+1. 현재 `orphaned`와 `system-deleted` 구현은 이 결정과 불일치한다.
+2. `primarySourceId` nullable 처리와 Review Log snapshot 보존을 위한 schema migration이
+   필요하다.
+3. `keep-history`는 Review Item 제거 후에도 Review Log를 유지할 수 있도록 FK 계약을
+   변경해야 한다.
+4. 세 삭제 정책을 설명하고 선택받는 UI가 필요하다.
+
+### 후속 조치
+
+1. SRS-FR-010, SRS-FR-012, 데이터 모델, 상태 모델을 이 결정에 맞춘다.
+2. `orphaned`와 `system-deleted`를 제거하는 migration 및 service repair TC를 먼저 정의한다.
+3. Review Log에 필요한 Source snapshot 필드를 TC에서 확정한다.
+4. 삭제 정책별 transaction과 로그 보존 TC를 분리한다.
+5. 기존 데이터 migration 실패 시 rollback 동작을 검증한다.
+
+---
+
 ## 결정 간 의존성
 
 | 결정 | 의존 대상 | 설명 |
@@ -772,6 +881,7 @@ Preload는 최소 API만 contextBridge로 노출하고, 모든 IPC 요청은 sen
 | ADR-011 | ADR-006 | 변경 처리 시 FSRS 상태를 임의 변경하지 않는다. |
 | ADR-012 | ADR-006 | 4단계 버튼 평가가 FSRS rating으로 매핑된다. |
 | ADR-013 | ADR-003 | Notion API 호출은 페이지 속성 중심으로 제한한다. |
+| ADR-015 | ADR-002, ADR-003, ADR-005 | Source 정규화와 삭제 정책은 SQLite, Notion Target, Page ID 식별 규칙에 의존한다. |
 
 ---
 
@@ -811,11 +921,10 @@ Preload는 최소 API만 contextBridge로 노출하고, 모든 IPC 요청은 sen
 
 ## 다음에 작성할 후보 ADR
 
-1. ADR-015 — SQLite schema migration tool 선택
-2. ADR-016 — UI framework와 state management 선택
-3. ADR-017 — Windows packaging 방식 선택
-4. ADR-018 — 테스트 전략과 E2E 도구 선택
-5. ADR-019 — Review Log 보존/삭제 정책
-6. ADR-020 — 랜덤순 세션 고정 정책
-7. ADR-021 — 평가 되돌리기 지원 여부
-8. ADR-022 — 자동 동기화 도입 조건
+1. ADR-016 — SQLite schema migration tool 선택
+2. ADR-017 — UI framework와 state management 선택
+3. ADR-018 — Windows packaging 방식 선택
+4. ADR-019 — 테스트 전략과 E2E 도구 선택
+5. ADR-020 — 랜덤순 세션 고정 정책
+6. ADR-021 — 평가 되돌리기 지원 여부
+7. ADR-022 — 자동 동기화 도입 조건
