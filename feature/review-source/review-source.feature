@@ -29,6 +29,14 @@
     조건 동일한 Notion 대상이 이미 등록되어 있다
     만일 사용자가 같은 대상을 새 Source로 저장한다
     그러면 중복 Source 경고가 표시된다
+    그리고 새 Source는 저장되지 않는다
+
+  @SRS-FR-010
+  시나리오: 여러 Data Source를 가진 Database 입력을 거부한다
+    조건 입력한 Notion Database에 여러 Data Source가 있다
+    만일 사용자가 Database를 Source로 저장한다
+    그러면 Source는 저장되지 않는다
+    그리고 등록할 Data Source URL 또는 ID를 직접 입력하라는 안내가 표시된다
 
   @SRS-FR-010
   시나리오 개요: 수집 방식의 조건부 필수값을 검증한다
@@ -64,6 +72,20 @@
     만일 사용자가 Source 삭제를 요청한다
     그러면 단독 참조 항목의 개수와 영향 범위가 표시된다
     그리고 항목 처리 방식을 선택하기 전에는 Source를 삭제하지 않는다
+
+  @SRS-FR-012
+  시나리오 개요: 단독 참조 항목을 선택한 삭제 정책으로 처리한다
+    조건 삭제할 Source만 참조하는 Review Item과 기존 Review Log가 있다
+    만일 사용자가 "<정책>" 정책으로 Source를 삭제한다
+    그러면 Review Item은 "<Item 결과>" 상태가 된다
+    그리고 기존 Review Log는 유지된다
+    그리고 orphaned 상태와 system-deleted Source는 생성되지 않는다
+
+    예:
+      | 정책         | Item 결과                         |
+      | archive      | archived                          |
+      | delete       | deleted tombstone                 |
+      | keep-history | 제거되고 Review Log snapshot 유지 |
 
   @SRS-FR-013
   시나리오: 비활성 Source를 동기화에서 제외한다

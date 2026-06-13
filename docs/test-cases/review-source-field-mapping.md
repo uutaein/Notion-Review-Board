@@ -52,6 +52,18 @@ The persistence contract must support:
 - insert and update without resetting `createdAt` or `lastSyncedAt`
 - deletion inside a transaction with affected Review Item references
 - preserving Review Logs when a Source is updated or deleted
+- nullable primary Source for archived/deleted Items without an active Source
+- Review Log Source snapshots that survive Source and optional Review Item removal
+
+Source deletion policies are fixed by ADR-015:
+
+| Policy | Item result | Log result |
+| --- | --- | --- |
+| `archive` | Full Item retained with `archived` status | Preserved |
+| `delete` | Minimal `deleted` tombstone retained | Preserved |
+| `keep-history` | Operational Item removed | Preserved as immutable snapshot |
+
+`orphaned` status and a `system-deleted` sentinel Source are forbidden.
 
 The IPC/preload boundary may expose intent-specific Source and mapping methods only. Every request
 must validate the sender, exact object shape, IDs, strings, enums, nested mapping/filter objects,
@@ -91,9 +103,10 @@ mapping falls back to the Notion page URL. Empty category and tag values project
 | TC-SOURCE-007 | FR-010 | Tag mode requires property, supported operator, and non-empty value |
 | TC-SOURCE-008 | FR-010/020 | Checkbox mode requires a checkbox property mapping |
 | TC-SOURCE-009 | FR-010 | All mode clears stale tag and checkbox collection configuration |
-| TC-SOURCE-010 | FR-010 | Database and Data Source URLs/IDs resolve to a normalized target ID and type |
+| TC-SOURCE-010 | FR-010 | A Database with exactly one Data Source resolves to that normalized Data Source ID |
 | TC-SOURCE-011 | FR-010 | Duplicate normalized target returns a stable duplicate warning and performs no insert |
 | TC-SOURCE-012 | FR-010 | Concurrent duplicate creation is rejected by persistence uniqueness |
+| TC-SOURCE-028 | FR-010 | A Database with multiple Data Sources is rejected without automatic selection or insert |
 | TC-SOURCE-013 | FR-011 | Updating a Source changes only editable settings and `updatedAt` |
 | TC-SOURCE-014 | FR-011 | Update preserves Source ID, `createdAt`, `lastSyncedAt`, Review Items, and Review Logs |
 | TC-SOURCE-015 | FR-011 | Changing mode revalidates and normalizes mode-specific configuration |
@@ -103,9 +116,15 @@ mapping falls back to the Notion page URL. Empty category and tag values project
 | TC-SOURCE-019 | FR-012 | Deletion without an explicit item policy is rejected |
 | TC-SOURCE-020 | FR-012 | Deleting one shared Source removes only that Source ID from shared Review Items |
 | TC-SOURCE-021 | FR-012 | Shared items receive a valid remaining primary Source when the deleted Source was primary |
-| TC-SOURCE-022 | FR-012 | Sole-reference items follow the selected archive, delete, or keep-history policy |
+| TC-SOURCE-022 | FR-012 | Archive retains the full Item as `archived` and preserves every Review Log |
 | TC-SOURCE-023 | FR-012 | Source deletion preserves existing Review Logs |
 | TC-SOURCE-024 | FR-012 | Source deletion and Review Item reference changes are atomic |
+| TC-SOURCE-029 | FR-012 | Delete retains a minimal `deleted` tombstone and preserves every Review Log |
+| TC-SOURCE-030 | FR-012 | Keep-history removes the operational Item and preserves immutable Review Log snapshots |
+| TC-SOURCE-031 | FR-012 | No deletion policy creates `orphaned` status or a `system-deleted` Source |
+| TC-SOURCE-032 | FR-012 | An archived/deleted Item without a live Source persists with null primary Source and empty source IDs |
+| TC-SOURCE-033 | FR-012 | Migration removes legacy orphaned/sentinel references without losing Items or Review Logs |
+| TC-SOURCE-034 | FR-012 | Migration failure rolls back schema and data changes |
 | TC-SOURCE-025 | FR-013 | Disabling a Source excludes it from sync target listing |
 | TC-SOURCE-026 | FR-013 | Disabling a Source does not delete or change existing Review Item status or due date |
 | TC-SOURCE-027 | FR-013 | Re-enabling a Source makes it eligible for the next manual synchronization |
@@ -170,3 +189,6 @@ mapping falls back to the Notion page URL. Empty category and tag values project
    internal database errors.
 10. Add a schema migration for any new mapping field, including the last-edited property, rather
     than overloading an unrelated existing column.
+11. Do not use `orphaned` or a hidden `system-deleted` Source to satisfy foreign keys.
+12. Keep-history requires a Review Log snapshot contract that remains valid after Review Item
+    removal.

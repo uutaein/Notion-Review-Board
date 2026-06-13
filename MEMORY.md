@@ -29,7 +29,11 @@
 
 - Notion Page is the review unit.
 - Notion DB/Data Source is Review Source.
-- Review Log must be preserved by default.
+- Database inputs with multiple Data Sources are rejected; users must enter a Data Source directly.
+- Duplicate normalized Notion Targets are rejected.
+- Source deletion supports archive, delete tombstone, and keep-history policies.
+- Review Logs are preserved for every Source deletion policy.
+- `orphaned` status and `system-deleted` sentinel Source are not used.
 - Changed pages do not automatically alter dueAt.
 - Missing pages are not immediately deleted.
 
@@ -41,6 +45,8 @@
 - Root TRACEABILITY.md created to connect PRD, SRS, Feature, TC, code, tests, and status.
 - AGENTS.md updated from the previous reservation project to the current Notion Review Board context.
 - Shared agent rules now cover Gemini/Codex roles, Electron security, SDD traceability, and automatic handoff updates.
+- ADR-015 accepted for Source target resolution, uniqueness, deletion policies, and log preservation.
+- SRS-OPEN-002 and SRS-OPEN-004 closed by ADR-015.
 - Verification baseline: 11 Vitest files and 152 tests passed; typecheck passed.
 - Cucumber Feature scenarios are specifications only; dry-run reports undefined steps.
 - Collection Engine Feature now separates candidate selection from synchronization orchestration.
@@ -116,7 +122,6 @@
 
 ## Open Questions
 
-- SRS-OPEN-002: Database vs Data Source compatibility
 - SRS-OPEN-003: deleted 확정 기준
 - SRS-OPEN-010: FSRS state serialization
 
@@ -134,6 +139,9 @@
   against the user's workspace still needs live Electron verification.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
+- Current code uses `orphaned` status and `system-deleted` Source contrary to accepted ADR-015.
+- ADR-015 requires a migration before the Source deletion backend can be considered verified.
+- No standalone TEST_MATRIX exists; `docs/test-cases/*.md` currently serves as the test matrix.
 
 ## Regression Scope
 
