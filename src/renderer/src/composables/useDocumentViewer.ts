@@ -3,13 +3,16 @@ import type {
   DocumentViewerBoundsDto,
   DocumentViewerCloseResultDto,
   DocumentViewerOpenInputDto,
-  DocumentViewerOpenResultDto
+  DocumentViewerOpenResultDto,
+  DocumentViewerResizeInputDto,
+  DocumentViewerResizeResultDto
 } from '../../../shared/document-viewer'
 
 export interface DocumentViewerRendererApi {
   open: (payload: DocumentViewerOpenInputDto) => Promise<DocumentViewerOpenResultDto>
   openExternal: (payload: { url: string }) => Promise<DocumentViewerOpenResultDto>
   close: () => Promise<DocumentViewerCloseResultDto>
+  resize: (payload: DocumentViewerResizeInputDto) => Promise<DocumentViewerResizeResultDto>
 }
 
 type DocumentViewerUiState = 'idle' | 'opening' | 'error'
@@ -29,6 +32,7 @@ function publicError(error: unknown): string {
 export function useDocumentViewer(api: DocumentViewerRendererApi) {
   const state = ref<DocumentViewerUiState>('idle')
   const message = ref('')
+  const isOpen = ref(false)
 
   async function open(url: string, bounds: DocumentViewerBoundsDto): Promise<boolean> {
     if (state.value === 'opening') return false
@@ -38,10 +42,12 @@ export function useDocumentViewer(api: DocumentViewerRendererApi) {
     try {
       await api.open({ url, bounds })
       state.value = 'idle'
+      isOpen.value = true
       message.value = '내부 뷰어에서 문서를 열었습니다.'
       return true
     } catch (error) {
       state.value = 'error'
+      isOpen.value = false
       message.value = publicError(error)
       return false
     }
@@ -70,13 +76,26 @@ export function useDocumentViewer(api: DocumentViewerRendererApi) {
     } catch {
       // Closing is best-effort because the view may already be gone after window teardown.
     }
+    isOpen.value = false
+  }
+
+  async function resize(bounds: DocumentViewerBoundsDto): Promise<void> {
+    if (!isOpen.value) return
+
+    try {
+      await api.resize({ bounds })
+    } catch {
+      // Bounds refresh is best-effort; a later layout pass can correct the view.
+    }
   }
 
   return {
     state,
     message,
+    isOpen,
     open,
     openExternal,
-    close
+    close,
+    resize
   }
 }

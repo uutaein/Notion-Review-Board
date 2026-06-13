@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useDocumentViewer } from './composables/useDocumentViewer'
 import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
@@ -14,6 +14,7 @@ type AppView = 'today-review' | 'notion-integration' | 'changed-pages' | 'missin
 const appVersion = ref('0.1.0')
 const activeView = ref<AppView>('today-review')
 const documentViewerSlot = ref<HTMLElement | null>(null)
+let documentViewerResizeObserver: ResizeObserver | null = null
 const {
   items: reviewItems,
   selectedId,
@@ -32,9 +33,11 @@ const {
 const {
   state: documentViewerState,
   message: documentViewerMessage,
+  isOpen: isDocumentViewerOpen,
   open: openDocumentViewer,
   openExternal: openDocumentExternal,
-  close: closeDocumentViewer
+  close: closeDocumentViewer,
+  resize: resizeDocumentViewer
 } = useDocumentViewer(window.documentViewer)
 const {
   items: statusItems,
@@ -134,16 +137,47 @@ async function openStatusView(view: 'changed-pages' | 'missing-deleted-pages'): 
   await loadStatusPage(view === 'changed-pages' ? 'changed' : 'missing-deleted')
 }
 
-async function openSelectedItemInternal(): Promise<void> {
-  if (selectedItem.value?.notionUrl && documentViewerSlot.value) {
-    const bounds = documentViewerSlot.value.getBoundingClientRect()
-    await openDocumentViewer(selectedItem.value.notionUrl, {
-      x: bounds.x,
-      y: bounds.y,
-      width: bounds.width,
-      height: bounds.height
-    })
+function currentDocumentViewerBounds(): {
+  x: number
+  y: number
+  width: number
+  height: number
+} | null {
+  if (!documentViewerSlot.value) return null
+
+  const bounds = documentViewerSlot.value.getBoundingClientRect()
+  return {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height
   }
+}
+
+async function openSelectedItemInternal(): Promise<void> {
+  const bounds = currentDocumentViewerBounds()
+  if (selectedItem.value?.notionUrl && bounds) {
+    await openDocumentViewer(selectedItem.value.notionUrl, bounds)
+  }
+}
+
+async function resizeSelectedItemViewer(): Promise<void> {
+  const bounds = currentDocumentViewerBounds()
+  if (bounds) {
+    await resizeDocumentViewer(bounds)
+  }
+}
+
+function scheduleViewerResize(): void {
+  window.requestAnimationFrame(() => {
+    void resizeSelectedItemViewer()
+  })
+}
+
+async function openSelectedItemInDefaultViewer(): Promise<void> {
+  await closeDocumentViewer()
+  await nextTick()
+  await openSelectedItemInternal()
 }
 
 async function openSelectedItemExternal(): Promise<void> {
@@ -190,6 +224,13 @@ onMounted(async () => {
     loadNotionStatus()
   ])
   appVersion.value = version
+
+  documentViewerResizeObserver = new ResizeObserver(scheduleViewerResize)
+  if (documentViewerSlot.value) {
+    documentViewerResizeObserver.observe(documentViewerSlot.value)
+  }
+  window.addEventListener('resize', scheduleViewerResize)
+  window.addEventListener('scroll', scheduleViewerResize, true)
 })
 
 watch(activeView, async (view) => {
@@ -199,10 +240,21 @@ watch(activeView, async (view) => {
 })
 
 watch(selectedId, async () => {
-  await closeDocumentViewer()
+  if (activeView.value === 'today-review' && selectedItem.value?.notionUrl) {
+    await openSelectedItemInDefaultViewer()
+  } else {
+    await closeDocumentViewer()
+  }
+})
+
+watch(isDocumentViewerOpen, (open) => {
+  if (open) scheduleViewerResize()
 })
 
 onUnmounted(() => {
+  documentViewerResizeObserver?.disconnect()
+  window.removeEventListener('resize', scheduleViewerResize)
+  window.removeEventListener('scroll', scheduleViewerResize, true)
   disposeSync()
   void closeDocumentViewer()
 })
@@ -686,12 +738,6 @@ onUnmounted(() => {
               <h2>{{ selectedItem.title }}</h2>
             </div>
             <div class="viewer-actions">
-              <button
-                :disabled="documentViewerState === 'opening'"
-                @click="openSelectedItemInternal"
-              >
-                내부에서 열기
-              </button>
               <button
                 :disabled="documentViewerState === 'opening'"
                 @click="openSelectedItemExternal"

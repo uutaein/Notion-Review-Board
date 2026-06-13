@@ -2,7 +2,9 @@ import type { CollectionMode, FilterOperator } from '../shared/domain/source'
 import type {
   DocumentViewerOpenInputDto,
   DocumentViewerOpenResultDto,
-  DocumentViewerCloseResultDto
+  DocumentViewerCloseResultDto,
+  DocumentViewerResizeInputDto,
+  DocumentViewerResizeResultDto
 } from '../shared/document-viewer'
 import type { ManualSyncResult, SyncProgress } from '../shared/manual-sync'
 import type { NotionConnectionStatus } from '../shared/notion-connection'
@@ -185,6 +187,7 @@ export interface DocumentViewerAPI {
   open: (payload: DocumentViewerOpenInputDto) => Promise<DocumentViewerOpenResultDto>
   openExternal: (payload: { url: string }) => Promise<DocumentViewerOpenResultDto>
   close: () => Promise<DocumentViewerCloseResultDto>
+  resize: (payload: DocumentViewerResizeInputDto) => Promise<DocumentViewerResizeResultDto>
 }
 
 export type { ReviewRating }

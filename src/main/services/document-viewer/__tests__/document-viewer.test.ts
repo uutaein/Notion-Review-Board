@@ -184,4 +184,45 @@ describe('Document Viewer URL policy', () => {
       normalizeDocumentViewerBounds({ x: 0, y: 0, width: 640, height: 420 })
     ).not.toThrow()
   })
+
+  it('resizes the embedded viewer after it has been opened', async () => {
+    const view = {
+      setBounds: vi.fn(),
+      webContents: {
+        isDestroyed: vi.fn().mockReturnValue(false),
+        loadURL: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn(),
+        on: vi.fn(),
+        setWindowOpenHandler: vi.fn()
+      }
+    }
+    const parentWindow = {
+      isDestroyed: vi.fn().mockReturnValue(false),
+      focus: vi.fn(),
+      contentView: {
+        addChildView: vi.fn(),
+        removeChildView: vi.fn()
+      }
+    }
+    class FakeWebContentsView {
+      constructor() {
+        return view
+      }
+    }
+    const controller = createElectronDocumentViewerController({
+      getParentWindow: () => parentWindow as never,
+      shell: { openExternal: vi.fn() },
+      WebContentsViewClass: FakeWebContentsView as never
+    })
+
+    await controller.open({
+      url: 'https://www.notion.so/workspace/Page-abc123',
+      bounds: { x: 250, y: 150, width: 640, height: 420 }
+    })
+    expect(
+      controller.resize({ bounds: { x: 280.4, y: 160.4, width: 720.4, height: 460.4 } })
+    ).toEqual({ resized: true })
+
+    expect(view.setBounds).toHaveBeenLastCalledWith({ x: 280, y: 160, width: 720, height: 460 })
+  })
 })

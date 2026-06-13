@@ -90,7 +90,10 @@ const documentViewer = {
   }): Promise<any> => ipcRenderer.invoke('document-viewer:open', payload),
   openExternal: (payload: { url: string }): Promise<any> =>
     ipcRenderer.invoke('document-viewer:open-external', payload),
-  close: (): Promise<any> => ipcRenderer.invoke('document-viewer:close')
+  close: (): Promise<any> => ipcRenderer.invoke('document-viewer:close'),
+  resize: (payload: {
+    bounds: { x: number; y: number; width: number; height: number }
+  }): Promise<any> => ipcRenderer.invoke('document-viewer:resize', payload)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

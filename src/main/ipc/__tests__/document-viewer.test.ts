@@ -7,6 +7,7 @@ describe('Document Viewer IPC boundary', () => {
   let controller: {
     open: ReturnType<typeof vi.fn>
     openExternal: ReturnType<typeof vi.fn>
+    resize: ReturnType<typeof vi.fn>
     close: ReturnType<typeof vi.fn>
   }
   let isValidSender: ReturnType<typeof vi.fn<(event: unknown) => boolean>>
@@ -22,6 +23,7 @@ describe('Document Viewer IPC boundary', () => {
         opened: true,
         url: 'https://www.notion.so/workspace/Page-abc123'
       }),
+      resize: vi.fn().mockReturnValue({ resized: true }),
       close: vi.fn()
     }
     isValidSender = vi.fn<(event: unknown) => boolean>().mockReturnValue(true)
@@ -139,6 +141,31 @@ describe('Document Viewer IPC boundary', () => {
     await expect(handlers['document-viewer:close']({})).resolves.toEqual({ closed: true })
 
     expect(controller.close).toHaveBeenCalled()
+  })
+
+  it('resizes the embedded viewer with exact bounds payload', async () => {
+    await expect(
+      handlers['document-viewer:resize'](
+        {},
+        { bounds: { x: 250, y: 160, width: 720, height: 460 } }
+      )
+    ).resolves.toEqual({ resized: true })
+
+    expect(controller.resize).toHaveBeenCalledWith({
+      bounds: { x: 250, y: 160, width: 720, height: 460 }
+    })
+  })
+
+  it.each([
+    [],
+    [null],
+    [{ bounds: null }],
+    [{ bounds: { x: 250, y: 160, width: 720 } }],
+    [{ bounds: { x: 250, y: 160, width: 720, height: Number.POSITIVE_INFINITY } }],
+    [{ bounds: { x: 250, y: 160, width: 720, height: 460 }, token: 'secret' }]
+  ])('rejects invalid resize payload %#', async (...args) => {
+    await expect(handlers['document-viewer:resize']({}, ...args)).rejects.toThrow('INVALID_PAYLOAD')
+    expect(controller.resize).not.toHaveBeenCalled()
   })
 
   it('rejects close requests with unexpected payload', async () => {

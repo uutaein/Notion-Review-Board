@@ -2,7 +2,9 @@ import type {
   DocumentViewerBoundsDto,
   DocumentViewerCloseResultDto,
   DocumentViewerOpenInputDto,
-  DocumentViewerOpenResultDto
+  DocumentViewerOpenResultDto,
+  DocumentViewerResizeInputDto,
+  DocumentViewerResizeResultDto
 } from '../../shared/document-viewer'
 import type { DocumentViewerController } from '../services/document-viewer'
 
@@ -110,6 +112,22 @@ function validateExternalPayload(args: unknown[]): { url: string } {
   return { url }
 }
 
+function validateResizePayload(args: unknown[]): DocumentViewerResizeInputDto {
+  if (args.length !== 1) throw new Error('INVALID_PAYLOAD')
+
+  const payload = args[0]
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('INVALID_PAYLOAD')
+  }
+
+  const keys = Object.keys(payload)
+  if (keys.length !== 1 || keys[0] !== 'bounds') {
+    throw new Error('INVALID_PAYLOAD')
+  }
+
+  return { bounds: validateBoundsPayload((payload as { bounds?: unknown }).bounds) }
+}
+
 export function registerDocumentViewerIpc(dependencies: DocumentViewerIpcDependencies): void {
   const { controller, ipcMain, isValidSender } = dependencies
 
@@ -146,6 +164,14 @@ export function registerDocumentViewerIpc(dependencies: DocumentViewerIpcDepende
       if (args.length !== 0) throw new Error('INVALID_PAYLOAD')
       controller.close()
       return { closed: true }
+    })
+  )
+
+  ipcMain.handle(
+    'document-viewer:resize',
+    secureHandle((_event, ...args): DocumentViewerResizeResultDto => {
+      const payload = validateResizePayload(args)
+      return controller.resize(payload)
     })
   )
 }

@@ -20,8 +20,8 @@
 | TC-VIEWER-007    | FR-060     | IPC      | Untrusted sender invokes viewer open               | IPC rejects before controller access with `UNAUTHORIZED_SENDER`                 |
 | TC-VIEWER-008    | FR-061     | IPC      | Renderer asks to open an allowed Notion URL externally | IPC routes through the same Notion URL policy before `shell.openExternal`       |
 | TC-VIEWER-009    | FR-061     | IPC      | Internal open fails with raw Electron details      | Renderer-facing error is sanitized to `INTERNAL_ERROR` without stack            |
-| TC-VIEWER-UI-001 | FR-062     | Renderer | A Today Review item is selected                    | Title/category remain visible above document controls and rating buttons remain available |
-| TC-VIEWER-UI-002 | FR-062     | Renderer | Document/status detail content is long             | Viewer body scrolls internally and the rating/action controls stay fixed        |
+| TC-VIEWER-UI-001 | FR-062     | Renderer | A Today Review item is selected                    | The page opens in the embedded internal viewer by default and external open remains available |
+| TC-VIEWER-UI-002 | FR-062     | Renderer | Viewer panel bounds change after resize/layout shift | Embedded viewer bounds are refreshed to match the visible viewer slot           |
 | TC-VIEWER-UI-003 | FR-061     | Renderer | Unsafe URL error is returned                       | UI shows a sanitized public message, not the raw URL parser/backend detail      |
 
 ## Verification Notes

@@ -26,12 +26,13 @@ describe('Document Viewer preload API', () => {
       expect.objectContaining({
         open: expect.any(Function),
         openExternal: expect.any(Function),
-        close: expect.any(Function)
+        close: expect.any(Function),
+        resize: expect.any(Function)
       })
     )
 
     const api = exposeInMainWorld.mock.calls.find(([name]) => name === 'documentViewer')?.[1]
-    expect(Object.keys(api)).toEqual(['open', 'openExternal', 'close'])
+    expect(Object.keys(api)).toEqual(['open', 'openExternal', 'close', 'resize'])
     expect(api).not.toHaveProperty('invoke')
     expect(api).not.toHaveProperty('token')
     expect(api).not.toHaveProperty('database')
@@ -47,6 +48,7 @@ describe('Document Viewer preload API', () => {
     })
     await api.openExternal({ url: 'https://www.notion.so/workspace/Page-abc123' })
     await api.close()
+    await api.resize({ bounds: { x: 250, y: 160, width: 720, height: 460 } })
 
     expect(invoke.mock.calls).toEqual([
       [
@@ -57,7 +59,8 @@ describe('Document Viewer preload API', () => {
         }
       ],
       ['document-viewer:open-external', { url: 'https://www.notion.so/workspace/Page-abc123' }],
-      ['document-viewer:close']
+      ['document-viewer:close'],
+      ['document-viewer:resize', { bounds: { x: 250, y: 160, width: 720, height: 460 } }]
     ])
   })
 })

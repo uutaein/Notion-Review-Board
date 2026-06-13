@@ -204,16 +204,24 @@
   Main attaches the Notion view inside the main window with bounds validation.
 - Added a restricted `document-viewer:close` path and renderer cleanup so the embedded native view is
   removed when leaving Today Review, selecting another item, or unmounting.
+- Today Review now opens the selected page in the embedded internal viewer by default. The toolbar
+  keeps only the external browser fallback action.
+- Added a restricted `document-viewer:resize` path. Renderer refreshes embedded viewer bounds from
+  the right-panel slot on selection, ResizeObserver updates, window resize, and scroll/layout shifts.
 - Focused Document Viewer service, IPC, and renderer state-model verification passes 3 files and 25
   tests after the redirect-abort handling change.
 - Full regression now passes 34 files and 376 tests; typecheck and production build pass.
 - Focused Document Viewer service, IPC, preload, and renderer state-model verification passes 4 files
   and 38 tests after the embedded view change.
 - Full regression now passes 34 files and 387 tests; typecheck and production build pass.
+- Focused Document Viewer service, IPC, preload, and renderer state-model verification passes 4 files
+  and 47 tests after default internal open and resize handling.
+- Full regression now passes 34 files and 396 tests; typecheck and production build pass.
 
 ## Next Action
 
-- Re-test the live Electron embedded document view against a real allowed Notion page.
+- Re-test the live Electron embedded document view against a real allowed Notion page, including
+  resizing the window and changing right-panel size.
 - Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing data.
 - Consider component-level DOM automation for the viewer layout if renderer test dependencies are
   introduced.

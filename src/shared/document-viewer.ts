@@ -18,3 +18,11 @@ export interface DocumentViewerOpenResultDto {
 export interface DocumentViewerCloseResultDto {
   closed: true
 }
+
+export interface DocumentViewerResizeInputDto {
+  bounds: DocumentViewerBoundsDto
+}
+
+export interface DocumentViewerResizeResultDto {
+  resized: true
+}

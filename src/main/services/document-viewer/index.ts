@@ -3,7 +3,9 @@ import { WebContentsView as ElectronWebContentsView } from 'electron'
 import type {
   DocumentViewerBoundsDto,
   DocumentViewerOpenInputDto,
-  DocumentViewerOpenResultDto
+  DocumentViewerOpenResultDto,
+  DocumentViewerResizeInputDto,
+  DocumentViewerResizeResultDto
 } from '../../../shared/document-viewer'
 
 type WebContentsViewConstructor = typeof ElectronWebContentsView
@@ -11,6 +13,7 @@ type WebContentsViewConstructor = typeof ElectronWebContentsView
 export interface DocumentViewerController {
   open(input: DocumentViewerOpenInputDto): Promise<DocumentViewerOpenResultDto>
   openExternal(input: { url: string }): Promise<DocumentViewerOpenResultDto>
+  resize(input: DocumentViewerResizeInputDto): DocumentViewerResizeResultDto
   close(): void
 }
 
@@ -164,6 +167,13 @@ export function createElectronDocumentViewerController(
       const url = normalizeNotionDocumentUrl(input.url)
       await dependencies.shell.openExternal(url)
       return { opened: true, url }
+    },
+    resize(input) {
+      const bounds = normalizeDocumentViewerBounds(input.bounds)
+      if (viewerView && !viewerView.webContents.isDestroyed()) {
+        viewerView.setBounds(bounds)
+      }
+      return { resized: true }
     },
     close() {
       if (viewerView && attachedWindow && !attachedWindow.isDestroyed()) {
