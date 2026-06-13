@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useDocumentViewer } from './composables/useDocumentViewer'
 import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
@@ -13,6 +13,7 @@ type AppView = 'today-review' | 'notion-integration' | 'changed-pages' | 'missin
 
 const appVersion = ref('0.1.0')
 const activeView = ref<AppView>('today-review')
+const documentViewerSlot = ref<HTMLElement | null>(null)
 const {
   items: reviewItems,
   selectedId,
@@ -32,7 +33,8 @@ const {
   state: documentViewerState,
   message: documentViewerMessage,
   open: openDocumentViewer,
-  openExternal: openDocumentExternal
+  openExternal: openDocumentExternal,
+  close: closeDocumentViewer
 } = useDocumentViewer(window.documentViewer)
 const {
   items: statusItems,
@@ -133,8 +135,14 @@ async function openStatusView(view: 'changed-pages' | 'missing-deleted-pages'): 
 }
 
 async function openSelectedItemInternal(): Promise<void> {
-  if (selectedItem.value?.notionUrl) {
-    await openDocumentViewer(selectedItem.value.notionUrl)
+  if (selectedItem.value?.notionUrl && documentViewerSlot.value) {
+    const bounds = documentViewerSlot.value.getBoundingClientRect()
+    await openDocumentViewer(selectedItem.value.notionUrl, {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height
+    })
   }
 }
 
@@ -184,7 +192,20 @@ onMounted(async () => {
   appVersion.value = version
 })
 
-onUnmounted(disposeSync)
+watch(activeView, async (view) => {
+  if (view !== 'today-review') {
+    await closeDocumentViewer()
+  }
+})
+
+watch(selectedId, async () => {
+  await closeDocumentViewer()
+})
+
+onUnmounted(() => {
+  disposeSync()
+  void closeDocumentViewer()
+})
 </script>
 
 <template>
@@ -680,7 +701,7 @@ onUnmounted(disposeSync)
             </div>
           </div>
 
-          <div class="viewer-body">
+          <div ref="documentViewerSlot" class="viewer-body">
             <div class="viewer-placeholder">
               <span class="document-icon">N</span>
               <h3>Notion 문서 뷰어</h3>

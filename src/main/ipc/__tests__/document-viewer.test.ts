@@ -41,7 +41,13 @@ describe('Document Viewer IPC boundary', () => {
     isValidSender.mockReturnValue(false)
 
     await expect(
-      handlers['document-viewer:open']({}, { url: 'https://www.notion.so/workspace/Page-abc123' })
+      handlers['document-viewer:open'](
+        {},
+        {
+          url: 'https://www.notion.so/workspace/Page-abc123',
+          bounds: { x: 240, y: 150, width: 640, height: 420 }
+        }
+      )
     ).rejects.toMatchObject({ message: 'UNAUTHORIZED_SENDER', stack: '' })
     expect(controller.open).not.toHaveBeenCalled()
   })
@@ -52,7 +58,27 @@ describe('Document Viewer IPC boundary', () => {
     [[]],
     ['https://www.notion.so/workspace/Page-abc123'],
     [{ url: '' }],
-    [{ url: 'https://www.notion.so/workspace/Page-abc123', token: 'secret' }]
+    [{ url: 'https://www.notion.so/workspace/Page-abc123' }],
+    [{ url: 'https://www.notion.so/workspace/Page-abc123', bounds: null }],
+    [
+      {
+        url: 'https://www.notion.so/workspace/Page-abc123',
+        bounds: { x: 240, y: 150, width: 640 }
+      }
+    ],
+    [
+      {
+        url: 'https://www.notion.so/workspace/Page-abc123',
+        bounds: { x: 240, y: 150, width: 640, height: Number.NaN }
+      }
+    ],
+    [
+      {
+        url: 'https://www.notion.so/workspace/Page-abc123',
+        bounds: { x: 240, y: 150, width: 640, height: 420 },
+        token: 'secret'
+      }
+    ]
   ])('rejects invalid payload %#', async (...args) => {
     await expect(handlers['document-viewer:open']({}, ...args)).rejects.toThrow('INVALID_PAYLOAD')
     expect(controller.open).not.toHaveBeenCalled()
@@ -61,11 +87,15 @@ describe('Document Viewer IPC boundary', () => {
   it('routes internal open requests to the viewer controller', async () => {
     await handlers['document-viewer:open'](
       {},
-      { url: 'https://www.notion.so/workspace/Page-abc123' }
+      {
+        url: 'https://www.notion.so/workspace/Page-abc123',
+        bounds: { x: 240, y: 150, width: 640, height: 420 }
+      }
     )
 
     expect(controller.open).toHaveBeenCalledWith({
-      url: 'https://www.notion.so/workspace/Page-abc123'
+      url: 'https://www.notion.so/workspace/Page-abc123',
+      bounds: { x: 240, y: 150, width: 640, height: 420 }
     })
   })
 
@@ -84,7 +114,10 @@ describe('Document Viewer IPC boundary', () => {
     controller.open.mockRejectedValue(new Error('UNSAFE_DOCUMENT_URL'))
 
     await expect(
-      handlers['document-viewer:open']({}, { url: 'https://example.com/page' })
+      handlers['document-viewer:open'](
+        {},
+        { url: 'https://example.com/page', bounds: { x: 240, y: 150, width: 640, height: 420 } }
+      )
     ).rejects.toMatchObject({ message: 'UNSAFE_DOCUMENT_URL', stack: '' })
   })
 
@@ -92,7 +125,25 @@ describe('Document Viewer IPC boundary', () => {
     controller.open.mockRejectedValue(new Error('Electron load failure C:/local/path'))
 
     await expect(
-      handlers['document-viewer:open']({}, { url: 'https://www.notion.so/workspace/Page-abc123' })
+      handlers['document-viewer:open'](
+        {},
+        {
+          url: 'https://www.notion.so/workspace/Page-abc123',
+          bounds: { x: 240, y: 150, width: 640, height: 420 }
+        }
+      )
     ).rejects.toMatchObject({ message: 'INTERNAL_ERROR', stack: '' })
+  })
+
+  it('closes the embedded viewer without extra payload', async () => {
+    await expect(handlers['document-viewer:close']({})).resolves.toEqual({ closed: true })
+
+    expect(controller.close).toHaveBeenCalled()
+  })
+
+  it('rejects close requests with unexpected payload', async () => {
+    await expect(handlers['document-viewer:close']({}, {})).rejects.toThrow('INVALID_PAYLOAD')
+
+    expect(controller.close).not.toHaveBeenCalled()
   })
 })

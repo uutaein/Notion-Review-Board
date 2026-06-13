@@ -199,14 +199,21 @@
   can still be shown.
 - Confirmed synced real Review Items store Notion page URLs under `app.notion.com`; Document Viewer
   URL policy now allows HTTPS `notion.com` subdomains in addition to `notion.so` and `notion.site`.
+- Replaced the separate Document Viewer BrowserWindow with an embedded sandboxed
+  `WebContentsView`. Renderer sends the right-panel viewer slot bounds through restricted IPC, and
+  Main attaches the Notion view inside the main window with bounds validation.
+- Added a restricted `document-viewer:close` path and renderer cleanup so the embedded native view is
+  removed when leaving Today Review, selecting another item, or unmounting.
 - Focused Document Viewer service, IPC, and renderer state-model verification passes 3 files and 25
   tests after the redirect-abort handling change.
 - Full regression now passes 34 files and 376 tests; typecheck and production build pass.
+- Focused Document Viewer service, IPC, preload, and renderer state-model verification passes 4 files
+  and 38 tests after the embedded view change.
+- Full regression now passes 34 files and 387 tests; typecheck and production build pass.
 
 ## Next Action
 
-- Re-test the live Electron internal document window against a real allowed Notion page after the
-  `ERR_ABORTED` handling change.
+- Re-test the live Electron embedded document view against a real allowed Notion page.
 - Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing data.
 - Consider component-level DOM automation for the viewer layout if renderer test dependencies are
   introduced.
@@ -244,9 +251,10 @@
   still needs live Electron UI confirmation against the user's real Sources.
 - Missing/deleted status pages remain read-only. They intentionally do not implement deletion
   confirmation, recovery, archive, or history-preservation actions yet.
-- The internal Notion document viewer uses a sandboxed Electron BrowserWindow. Automated tests cover
-  the security options, URL policy, and Electron redirect-abort handling, but live Notion rendering
-  has not yet been manually verified after the latest fix.
+- The internal Notion document viewer uses a sandboxed Electron `WebContentsView` embedded in the
+  main window. Automated tests cover the security options, URL policy, bounds validation, cleanup,
+  and Electron redirect-abort handling, but live Notion rendering has not yet been manually verified
+  after the embedded-view change.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
 - Current code uses `orphaned` status and `system-deleted` Source contrary to accepted ADR-015.

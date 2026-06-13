@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createElectronDocumentViewerController,
   isAllowedNotionDocumentUrl,
+  normalizeDocumentViewerBounds,
   normalizeNotionDocumentUrl
 } from '..'
 
@@ -29,42 +30,45 @@ describe('Document Viewer URL policy', () => {
     expect(() => normalizeNotionDocumentUrl(url)).toThrow('UNSAFE_DOCUMENT_URL')
   })
 
-  it('opens the internal viewer without a preload or Node integration', async () => {
+  it('opens the internal viewer as an embedded WebContentsView without preload or Node integration', async () => {
     const loadURL = vi.fn().mockResolvedValue(undefined)
-    const show = vi.fn()
-    const focus = vi.fn()
-    const handlers: Record<string, (...args: unknown[]) => void> = {}
-    const window = {
-      isDestroyed: vi.fn().mockReturnValue(false),
-      isVisible: vi.fn().mockReturnValue(false),
-      loadURL,
-      show,
-      focus,
-      close: vi.fn(),
-      on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
-        handlers[event] = listener
-      }),
-      once: vi.fn(),
+    const setBounds = vi.fn()
+    const view = {
+      setBounds,
       webContents: {
+        isDestroyed: vi.fn().mockReturnValue(false),
+        loadURL,
+        close: vi.fn(),
         on: vi.fn(),
         setWindowOpenHandler: vi.fn()
       }
     }
+    const parentWindow = {
+      isDestroyed: vi.fn().mockReturnValue(false),
+      focus: vi.fn(),
+      contentView: {
+        addChildView: vi.fn(),
+        removeChildView: vi.fn()
+      }
+    }
     let createdOptions: unknown = null
-    class FakeBrowserWindow {
+    class FakeWebContentsView {
       constructor(options: unknown) {
         createdOptions = options
-        return window
+        return view
       }
     }
     const controller = createElectronDocumentViewerController({
-      getParentWindow: () => null,
+      getParentWindow: () => parentWindow as never,
       shell: { openExternal: vi.fn() },
-      BrowserWindowClass: FakeBrowserWindow as never
+      WebContentsViewClass: FakeWebContentsView as never
     })
 
     await expect(
-      controller.open({ url: 'https://www.notion.so/workspace/Page-abc123' })
+      controller.open({
+        url: 'https://www.notion.so/workspace/Page-abc123',
+        bounds: { x: 250.2, y: 150.6, width: 640.1, height: 420.9 }
+      })
     ).resolves.toEqual({
       opened: true,
       url: 'https://www.notion.so/workspace/Page-abc123'
@@ -84,77 +88,100 @@ describe('Document Viewer URL policy', () => {
     expect(
       (createdOptions as { webPreferences: Record<string, unknown> }).webPreferences
     ).not.toHaveProperty('preload')
+    expect(parentWindow.contentView.addChildView).toHaveBeenCalledWith(view)
+    expect(setBounds).toHaveBeenCalledWith({ x: 250, y: 151, width: 640, height: 421 })
     expect(loadURL).toHaveBeenCalledWith('https://www.notion.so/workspace/Page-abc123')
-    expect(show).toHaveBeenCalled()
-    expect(focus).toHaveBeenCalled()
+    expect(parentWindow.focus).toHaveBeenCalled()
   })
 
   it('treats Electron redirect aborts as an opened internal viewer', async () => {
     const loadURL = vi.fn().mockRejectedValue(new Error('ERR_ABORTED (-3) loading URL'))
-    const window = {
-      isDestroyed: vi.fn().mockReturnValue(false),
-      isVisible: vi.fn().mockReturnValue(false),
-      loadURL,
-      show: vi.fn(),
-      focus: vi.fn(),
-      close: vi.fn(),
-      on: vi.fn(),
-      once: vi.fn(),
+    const view = {
+      setBounds: vi.fn(),
       webContents: {
+        isDestroyed: vi.fn().mockReturnValue(false),
+        loadURL,
+        close: vi.fn(),
         on: vi.fn(),
         setWindowOpenHandler: vi.fn()
       }
     }
-    class FakeBrowserWindow {
+    const parentWindow = {
+      isDestroyed: vi.fn().mockReturnValue(false),
+      focus: vi.fn(),
+      contentView: {
+        addChildView: vi.fn(),
+        removeChildView: vi.fn()
+      }
+    }
+    class FakeWebContentsView {
       constructor() {
-        return window
+        return view
       }
     }
     const controller = createElectronDocumentViewerController({
-      getParentWindow: () => null,
+      getParentWindow: () => parentWindow as never,
       shell: { openExternal: vi.fn() },
-      BrowserWindowClass: FakeBrowserWindow as never
+      WebContentsViewClass: FakeWebContentsView as never
     })
 
     await expect(
-      controller.open({ url: 'https://www.notion.so/workspace/Page-abc123' })
+      controller.open({
+        url: 'https://www.notion.so/workspace/Page-abc123',
+        bounds: { x: 250, y: 150, width: 640, height: 420 }
+      })
     ).resolves.toEqual({
       opened: true,
       url: 'https://www.notion.so/workspace/Page-abc123'
     })
 
-    expect(window.show).toHaveBeenCalled()
-    expect(window.focus).toHaveBeenCalled()
+    expect(parentWindow.focus).toHaveBeenCalled()
   })
 
   it('still rejects non-redirect internal viewer load failures', async () => {
-    const window = {
-      isDestroyed: vi.fn().mockReturnValue(false),
-      isVisible: vi.fn().mockReturnValue(false),
-      loadURL: vi.fn().mockRejectedValue(new Error('ERR_NAME_NOT_RESOLVED')),
-      show: vi.fn(),
-      focus: vi.fn(),
-      close: vi.fn(),
-      on: vi.fn(),
-      once: vi.fn(),
+    const view = {
+      setBounds: vi.fn(),
       webContents: {
+        isDestroyed: vi.fn().mockReturnValue(false),
+        loadURL: vi.fn().mockRejectedValue(new Error('ERR_NAME_NOT_RESOLVED')),
+        close: vi.fn(),
         on: vi.fn(),
         setWindowOpenHandler: vi.fn()
       }
     }
-    class FakeBrowserWindow {
+    const parentWindow = {
+      isDestroyed: vi.fn().mockReturnValue(false),
+      focus: vi.fn(),
+      contentView: {
+        addChildView: vi.fn(),
+        removeChildView: vi.fn()
+      }
+    }
+    class FakeWebContentsView {
       constructor() {
-        return window
+        return view
       }
     }
     const controller = createElectronDocumentViewerController({
-      getParentWindow: () => null,
+      getParentWindow: () => parentWindow as never,
       shell: { openExternal: vi.fn() },
-      BrowserWindowClass: FakeBrowserWindow as never
+      WebContentsViewClass: FakeWebContentsView as never
     })
 
     await expect(
-      controller.open({ url: 'https://www.notion.so/workspace/Page-abc123' })
+      controller.open({
+        url: 'https://www.notion.so/workspace/Page-abc123',
+        bounds: { x: 250, y: 150, width: 640, height: 420 }
+      })
     ).rejects.toThrow('ERR_NAME_NOT_RESOLVED')
+  })
+
+  it('rejects invalid embedded viewer bounds', () => {
+    expect(() => normalizeDocumentViewerBounds({ x: 0, y: 0, width: 119, height: 420 })).toThrow(
+      'INVALID_PAYLOAD'
+    )
+    expect(() =>
+      normalizeDocumentViewerBounds({ x: 0, y: 0, width: 640, height: 420 })
+    ).not.toThrow()
   })
 })

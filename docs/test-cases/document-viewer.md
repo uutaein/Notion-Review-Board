@@ -11,11 +11,11 @@
 
 | ID               | SRS        | Type     | Scenario                                           | Expected result                                                                 |
 | ---------------- | ---------- | -------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
-| TC-VIEWER-001    | FR-060     | Main     | Open `https://app.notion.com/...` or `https://www.notion.so/...` internally | A sandboxed internal Electron document window loads the Notion URL              |
-| TC-VIEWER-002    | FR-060     | Main     | Open `https://workspace.notion.site/...` internally | A sandboxed internal Electron document window loads the Notion URL              |
+| TC-VIEWER-001    | FR-060     | Main     | Open `https://app.notion.com/...` or `https://www.notion.so/...` internally | A sandboxed embedded Electron document view loads the Notion URL                |
+| TC-VIEWER-002    | FR-060     | Main     | Open `https://workspace.notion.site/...` internally | A sandboxed embedded Electron document view loads the Notion URL                |
 | TC-VIEWER-003    | FR-060     | Main     | Open `http://www.notion.so/...` internally         | Request is rejected with `UNSAFE_DOCUMENT_URL`                                  |
 | TC-VIEWER-004    | FR-060     | Main     | Open `https://example.com/...` internally          | Request is rejected with `UNSAFE_DOCUMENT_URL`                                  |
-| TC-VIEWER-005    | FR-060     | Main     | Internal viewer is constructed                     | `nodeIntegration` is false, `contextIsolation` and `sandbox` are true, no preload |
+| TC-VIEWER-005    | FR-060     | Main     | Internal viewer is constructed                     | Embedded `WebContentsView` uses `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, and no preload |
 | TC-VIEWER-006    | FR-060     | IPC      | Renderer sends extra fields with viewer open       | IPC rejects before controller access with `INVALID_PAYLOAD`                     |
 | TC-VIEWER-007    | FR-060     | IPC      | Untrusted sender invokes viewer open               | IPC rejects before controller access with `UNAUTHORIZED_SENDER`                 |
 | TC-VIEWER-008    | FR-061     | IPC      | Renderer asks to open an allowed Notion URL externally | IPC routes through the same Notion URL policy before `shell.openExternal`       |
@@ -27,4 +27,4 @@
 ## Verification Notes
 
 - Feature files are still specifications only; Cucumber steps are undefined.
-- Live Notion login and content rendering in the internal window require manual Electron verification.
+- Live Notion login and content rendering in the embedded internal view require manual Electron verification.

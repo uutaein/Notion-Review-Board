@@ -25,12 +25,13 @@ describe('Document Viewer preload API', () => {
       'documentViewer',
       expect.objectContaining({
         open: expect.any(Function),
-        openExternal: expect.any(Function)
+        openExternal: expect.any(Function),
+        close: expect.any(Function)
       })
     )
 
     const api = exposeInMainWorld.mock.calls.find(([name]) => name === 'documentViewer')?.[1]
-    expect(Object.keys(api)).toEqual(['open', 'openExternal'])
+    expect(Object.keys(api)).toEqual(['open', 'openExternal', 'close'])
     expect(api).not.toHaveProperty('invoke')
     expect(api).not.toHaveProperty('token')
     expect(api).not.toHaveProperty('database')
@@ -40,12 +41,23 @@ describe('Document Viewer preload API', () => {
     invoke.mockResolvedValue({ opened: true, url: 'https://www.notion.so/workspace/Page-abc123' })
     const api = exposeInMainWorld.mock.calls.find(([name]) => name === 'documentViewer')?.[1]
 
-    await api.open({ url: 'https://www.notion.so/workspace/Page-abc123' })
+    await api.open({
+      url: 'https://www.notion.so/workspace/Page-abc123',
+      bounds: { x: 240, y: 150, width: 640, height: 420 }
+    })
     await api.openExternal({ url: 'https://www.notion.so/workspace/Page-abc123' })
+    await api.close()
 
     expect(invoke.mock.calls).toEqual([
-      ['document-viewer:open', { url: 'https://www.notion.so/workspace/Page-abc123' }],
-      ['document-viewer:open-external', { url: 'https://www.notion.so/workspace/Page-abc123' }]
+      [
+        'document-viewer:open',
+        {
+          url: 'https://www.notion.so/workspace/Page-abc123',
+          bounds: { x: 240, y: 150, width: 640, height: 420 }
+        }
+      ],
+      ['document-viewer:open-external', { url: 'https://www.notion.so/workspace/Page-abc123' }],
+      ['document-viewer:close']
     ])
   })
 })

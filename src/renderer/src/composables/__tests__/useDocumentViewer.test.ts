@@ -8,14 +8,25 @@ describe('Document viewer renderer model', () => {
         opened: true,
         url: 'https://www.notion.so/workspace/Page-abc123'
       }),
-      openExternal: vi.fn()
+      openExternal: vi.fn(),
+      close: vi.fn()
     }
     const model = useDocumentViewer(api)
 
-    await expect(model.open('https://www.notion.so/workspace/Page-abc123')).resolves.toBe(true)
+    await expect(
+      model.open('https://www.notion.so/workspace/Page-abc123', {
+        x: 240,
+        y: 150,
+        width: 640,
+        height: 420
+      })
+    ).resolves.toBe(true)
 
-    expect(api.open).toHaveBeenCalledWith({ url: 'https://www.notion.so/workspace/Page-abc123' })
-    expect(model.message.value).toBe('내부 Notion 문서 창을 열었습니다.')
+    expect(api.open).toHaveBeenCalledWith({
+      url: 'https://www.notion.so/workspace/Page-abc123',
+      bounds: { x: 240, y: 150, width: 640, height: 420 }
+    })
+    expect(model.message.value).toBe('내부 뷰어에서 문서를 열었습니다.')
   })
 
   it('opens a selected Notion URL through the stricter external viewer API', async () => {
@@ -24,7 +35,8 @@ describe('Document viewer renderer model', () => {
       openExternal: vi.fn().mockResolvedValue({
         opened: true,
         url: 'https://www.notion.so/workspace/Page-abc123'
-      })
+      }),
+      close: vi.fn()
     }
     const model = useDocumentViewer(api)
 
@@ -41,13 +53,29 @@ describe('Document viewer renderer model', () => {
   it('shows a sanitized unsafe URL message', async () => {
     const api: DocumentViewerRendererApi = {
       open: vi.fn().mockRejectedValue(new Error('UNSAFE_DOCUMENT_URL')),
-      openExternal: vi.fn()
+      openExternal: vi.fn(),
+      close: vi.fn()
     }
     const model = useDocumentViewer(api)
 
-    await expect(model.open('https://example.com/page')).resolves.toBe(false)
+    await expect(
+      model.open('https://example.com/page', { x: 240, y: 150, width: 640, height: 420 })
+    ).resolves.toBe(false)
 
     expect(model.state.value).toBe('error')
     expect(model.message.value).toBe('허용된 Notion HTTPS 문서만 열 수 있습니다.')
+  })
+
+  it('closes the embedded viewer through the preload API', async () => {
+    const api: DocumentViewerRendererApi = {
+      open: vi.fn(),
+      openExternal: vi.fn(),
+      close: vi.fn().mockResolvedValue({ closed: true })
+    }
+    const model = useDocumentViewer(api)
+
+    await model.close()
+
+    expect(api.close).toHaveBeenCalled()
   })
 })

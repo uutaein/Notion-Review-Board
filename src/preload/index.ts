@@ -84,10 +84,13 @@ const statusPages = {
 }
 
 const documentViewer = {
-  open: (payload: { url: string }): Promise<any> =>
-    ipcRenderer.invoke('document-viewer:open', payload),
+  open: (payload: {
+    url: string
+    bounds: { x: number; y: number; width: number; height: number }
+  }): Promise<any> => ipcRenderer.invoke('document-viewer:open', payload),
   openExternal: (payload: { url: string }): Promise<any> =>
-    ipcRenderer.invoke('document-viewer:open-external', payload)
+    ipcRenderer.invoke('document-viewer:open-external', payload),
+  close: (): Promise<any> => ipcRenderer.invoke('document-viewer:close')
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

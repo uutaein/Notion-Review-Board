@@ -1,22 +1,23 @@
-import type { BrowserWindow, Shell } from 'electron'
-import { BrowserWindow as ElectronBrowserWindow } from 'electron'
+import type { BrowserWindow, Rectangle, Shell, WebContentsView } from 'electron'
+import { WebContentsView as ElectronWebContentsView } from 'electron'
 import type {
+  DocumentViewerBoundsDto,
   DocumentViewerOpenInputDto,
   DocumentViewerOpenResultDto
 } from '../../../shared/document-viewer'
 
-type BrowserWindowConstructor = typeof ElectronBrowserWindow
+type WebContentsViewConstructor = typeof ElectronWebContentsView
 
 export interface DocumentViewerController {
   open(input: DocumentViewerOpenInputDto): Promise<DocumentViewerOpenResultDto>
-  openExternal(input: DocumentViewerOpenInputDto): Promise<DocumentViewerOpenResultDto>
+  openExternal(input: { url: string }): Promise<DocumentViewerOpenResultDto>
   close(): void
 }
 
 export interface ElectronDocumentViewerDependencies {
   getParentWindow: () => BrowserWindow | null
   shell: Pick<Shell, 'openExternal'>
-  BrowserWindowClass?: BrowserWindowConstructor
+  WebContentsViewClass?: WebContentsViewConstructor
 }
 
 const ALLOWED_NOTION_HOSTS = new Set([
@@ -58,6 +59,32 @@ export function normalizeNotionDocumentUrl(value: string): string {
   return trimmed
 }
 
+export function normalizeDocumentViewerBounds(bounds: DocumentViewerBoundsDto): Rectangle {
+  const normalized = {
+    x: Math.round(bounds.x),
+    y: Math.round(bounds.y),
+    width: Math.round(bounds.width),
+    height: Math.round(bounds.height)
+  }
+
+  if (
+    !Number.isSafeInteger(normalized.x) ||
+    !Number.isSafeInteger(normalized.y) ||
+    !Number.isSafeInteger(normalized.width) ||
+    !Number.isSafeInteger(normalized.height) ||
+    normalized.x < 0 ||
+    normalized.y < 0 ||
+    normalized.width < 120 ||
+    normalized.height < 120 ||
+    normalized.width > 8000 ||
+    normalized.height > 8000
+  ) {
+    throw new Error('INVALID_PAYLOAD')
+  }
+
+  return normalized
+}
+
 function isIgnorableLoadUrlError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : ''
   return message.includes('ERR_ABORTED')
@@ -66,24 +93,16 @@ function isIgnorableLoadUrlError(error: unknown): boolean {
 export function createElectronDocumentViewerController(
   dependencies: ElectronDocumentViewerDependencies
 ): DocumentViewerController {
-  const BrowserWindowClass = dependencies.BrowserWindowClass ?? ElectronBrowserWindow
-  let viewerWindow: BrowserWindow | null = null
+  const WebContentsViewClass = dependencies.WebContentsViewClass ?? ElectronWebContentsView
+  let viewerView: WebContentsView | null = null
+  let attachedWindow: BrowserWindow | null = null
 
-  const ensureViewerWindow = (): BrowserWindow => {
-    if (viewerWindow && !viewerWindow.isDestroyed()) {
-      return viewerWindow
+  const ensureViewerView = (): WebContentsView => {
+    if (viewerView && !viewerView.webContents.isDestroyed()) {
+      return viewerView
     }
 
-    const parent = dependencies.getParentWindow()
-    viewerWindow = new BrowserWindowClass({
-      parent: parent ?? undefined,
-      width: 1120,
-      height: 820,
-      minWidth: 720,
-      minHeight: 520,
-      show: false,
-      autoHideMenuBar: true,
-      title: 'Notion 문서',
+    viewerView = new WebContentsViewClass({
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -93,42 +112,51 @@ export function createElectronDocumentViewerController(
       }
     })
 
-    viewerWindow.on('closed', () => {
-      viewerWindow = null
-    })
-
-    viewerWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    viewerView.webContents.on('will-navigate', (event, targetUrl) => {
       if (!isAllowedNotionDocumentUrl(targetUrl)) {
         event.preventDefault()
       }
     })
 
-    viewerWindow.webContents.setWindowOpenHandler(({ url }) => {
+    viewerView.webContents.setWindowOpenHandler(({ url }) => {
       if (isAllowedNotionDocumentUrl(url)) {
-        void viewerWindow?.loadURL(url).catch(() => undefined)
+        void viewerView?.webContents.loadURL(url).catch(() => undefined)
       }
       return { action: 'deny' }
     })
 
-    viewerWindow.once('ready-to-show', () => {
-      viewerWindow?.show()
-    })
+    return viewerView
+  }
 
-    return viewerWindow
+  const attachView = (view: WebContentsView, window: BrowserWindow): void => {
+    if (attachedWindow === window) return
+
+    if (attachedWindow && !attachedWindow.isDestroyed()) {
+      attachedWindow.contentView.removeChildView(view)
+    }
+
+    window.contentView.addChildView(view)
+    attachedWindow = window
   }
 
   return {
     async open(input) {
       const url = normalizeNotionDocumentUrl(input.url)
-      const window = ensureViewerWindow()
+      const bounds = normalizeDocumentViewerBounds(input.bounds)
+      const window = dependencies.getParentWindow()
+      if (!window || window.isDestroyed()) {
+        throw new Error('INTERNAL_ERROR')
+      }
+      const view = ensureViewerView()
+      attachView(view, window)
+      view.setBounds(bounds)
       try {
-        await window.loadURL(url)
+        await view.webContents.loadURL(url)
       } catch (error) {
         if (!isIgnorableLoadUrlError(error)) {
           throw error
         }
       }
-      if (!window.isVisible()) window.show()
       window.focus()
       return { opened: true, url }
     },
@@ -138,10 +166,14 @@ export function createElectronDocumentViewerController(
       return { opened: true, url }
     },
     close() {
-      if (viewerWindow && !viewerWindow.isDestroyed()) {
-        viewerWindow.close()
+      if (viewerView && attachedWindow && !attachedWindow.isDestroyed()) {
+        attachedWindow.contentView.removeChildView(viewerView)
       }
-      viewerWindow = null
+      if (viewerView && !viewerView.webContents.isDestroyed()) {
+        viewerView.webContents.close()
+      }
+      viewerView = null
+      attachedWindow = null
     }
   }
 }
