@@ -241,6 +241,8 @@ describe('Review Source settings renderer model', () => {
     )
     expect(reviewSource.createSource).not.toHaveBeenCalled()
     expect(model.message.value).toBe('Review Source가 수정되었습니다.')
+    expect(model.isEditing.value).toBe(false)
+    expect(model.form.value.name).toBe('')
     expect(onSourcesChanged).toHaveBeenCalled()
   })
 

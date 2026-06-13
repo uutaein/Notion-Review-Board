@@ -351,6 +351,7 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
           id: editingSourceId.value,
           ...sourcePayload()
         })
+        resetForm()
         message.value = 'Review Source가 수정되었습니다.'
       } else {
         await dependencies.reviewSource.createSource({

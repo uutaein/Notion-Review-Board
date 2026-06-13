@@ -143,6 +143,8 @@
 - Source delete requires an explicit policy selection before confirmation.
 - Focused Source settings renderer verification passes 1 file and 12 tests; renderer typecheck
   passes.
+- Source update now exits edit mode and clears the form so a new Source can be registered
+  immediately; the edit header also exposes an explicit `새 Source` reset action.
 
 ## Next Action
 
@@ -175,6 +177,8 @@
   Electron window remains manual.
 - Review Source edit/delete UI has focused state-model coverage but still needs live Electron
   confirmation against existing real Sources.
+- The Source edit-to-new flow has focused state-model coverage but still needs live Electron
+  confirmation.
 - The internal Notion document viewer remains a placeholder; selected items currently support
   external browser opening only.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files

@@ -294,13 +294,25 @@ onUnmounted(disposeSync)
               }}
             </p>
           </div>
-          <button
-            class="secondary-button"
-            :disabled="isSourceBusy || !sourceForm.target.trim()"
-            @click="loadProperties"
-          >
-            {{ sourceState === 'loading' ? '속성 조회 중' : '속성 불러오기' }}
-          </button>
+          <div class="source-header-actions">
+            <button
+              v-if="isEditingSource"
+              class="secondary-button"
+              type="button"
+              :disabled="isSourceBusy"
+              @click="resetSourceForm"
+            >
+              새 Source
+            </button>
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="isSourceBusy || !sourceForm.target.trim()"
+              @click="loadProperties"
+            >
+              {{ sourceState === 'loading' ? '속성 조회 중' : '속성 불러오기' }}
+            </button>
+          </div>
         </div>
 
         <form class="source-form" @submit.prevent="saveSource">
