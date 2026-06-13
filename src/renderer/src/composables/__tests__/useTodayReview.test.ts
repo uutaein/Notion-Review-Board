@@ -16,6 +16,7 @@ function item(id: string) {
   return {
     id,
     title: `Title ${id}`,
+    sourceId: 'source-a',
     sourceName: 'Source A',
     displayCategory: '미분류',
     tags: ['미분류'],
@@ -49,6 +50,44 @@ describe('Today Review renderer model', () => {
     await model.load()
 
     expect(model.selectedItem.value?.id).toBe('item-2')
+  })
+
+  it('loads Today Review rows for a selected Review Source filter', async () => {
+    const api = apiWithItems([item('item-1')])
+    const model = useTodayReview(api)
+
+    await model.setSourceFilter('source-a')
+
+    expect(api.list).toHaveBeenCalledWith({
+      sort: 'due',
+      filter: { kind: 'source', sourceId: 'source-a' }
+    })
+    expect(model.sourceFilterId.value).toBe('source-a')
+    expect(model.selectedItem.value?.id).toBe('item-1')
+  })
+
+  it('removes a completed item from the current Today Review session', async () => {
+    const model = useTodayReview(apiWithItems([item('item-1'), item('item-2')]))
+
+    await model.load()
+    model.selectedId.value = 'item-1'
+    model.removeItem('item-1')
+
+    expect(model.items.value.map(({ id }) => id)).toEqual(['item-2'])
+    expect(model.selectedItem.value?.id).toBe('item-2')
+  })
+
+  it('shows the empty state when the last completed item is removed from the session', async () => {
+    const model = useTodayReview(apiWithItems([item('item-1')]))
+
+    await model.load()
+    model.removeItem('item-1')
+
+    expect(model.items.value).toEqual([])
+    expect(model.selectedItem.value).toBeNull()
+    expect(model.message.value).toBe(
+      '오늘 복습할 항목이 없습니다. Source를 동기화하면 새 항목이 표시됩니다.'
+    )
   })
 
   it('shows an actionable empty state for an empty Today Review queue', async () => {

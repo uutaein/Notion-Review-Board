@@ -12,7 +12,7 @@
 ## Current Phase
 
 - Phase: SRS → Feature → TC
-- Active Feature: today-review renderer data binding + manual-sync
+- Active Feature: review rating IPC/preload/renderer binding
 - Active SRS IDs:
   - SRS-FR-050
   - SRS-FR-051
@@ -26,6 +26,9 @@
   - SRS-FR-043
   - SRS-FR-044
   - SRS-FR-045
+  - SRS-FR-070
+  - SRS-FR-071
+  - SRS-FR-072
   - SRS-FR-093
 
 ## Current Decision Summary
@@ -145,11 +148,30 @@
   passes.
 - Source update now exits edit mode and clears the form so a new Source can be registered
   immediately; the edit header also exposes an explicit `새 Source` reset action.
+- Connected the Today Review rating buttons to the existing FSRS SchedulingService through a
+  restricted `review:rate` IPC channel and `reviewRating.rate` preload API.
+- The Main Process now composes SchedulingService with the existing FSRS adapter and
+  `DatabaseService.recordReview` transaction, so accepted ratings update Review Item scheduling and
+  create Review Logs atomically.
+- Rating buttons disable while a submission is pending, reject duplicate rapid clicks in renderer
+  state, refresh Today Review after success, and display sanitized public errors after failure.
+- Same-day FSRS results such as `hard` and `again` can still be due today in storage, so the
+  renderer removes the completed item from the current Today Review session after a successful
+  rating to satisfy the "current Today Review" removal rule.
+- Added Today Review Source filtering through the existing Manual Sync Source controls. Selecting
+  or syncing a single Source shows that Source's queue, while full sync resets to the full queue.
+  Source filtering is enforced in the Main Process service with
+  `ReviewItem.sourceIds.includes(sourceId)` so shared pages appear under every referenced Source.
+- Focused Review Rating IPC, preload, and renderer state-model verification passes 3 files and 17
+  tests; full typecheck passes.
+- Focused Today Review service, IPC, preload, and renderer state-model verification passes 4 files
+  and 36 tests after adding Source filtering.
+- Full regression now passes 26 files and 300 tests.
 
 ## Next Action
 
-- Use the `Notion 연동` tab to save/verify the provided API key, register the user's real Notion
-  DB/Data Source, run live Manual Sync, and confirm synced pages appear in Today Review.
+- Use the live Electron UI to rate one Today Review item and confirm it disappears when FSRS moves
+  its next due date into the future.
 - Consider adding component-level DOM automation if renderer test dependencies are introduced.
 
 ## Open Questions
@@ -179,6 +201,10 @@
   confirmation against existing real Sources.
 - The Source edit-to-new flow has focused state-model coverage but still needs live Electron
   confirmation.
+- Review Rating IPC/preload/renderer binding has focused automated coverage, but live Electron UI
+  rating against the user's synced data has not yet been manually confirmed.
+- Today Review Source filtering through the Manual Sync controls has focused automated coverage but
+  still needs live Electron UI confirmation against the user's real Sources.
 - The internal Notion document viewer remains a placeholder; selected items currently support
   external browser opening only.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files

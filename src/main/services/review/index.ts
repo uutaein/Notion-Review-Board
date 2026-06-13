@@ -26,6 +26,8 @@ export interface TodayReviewItem {
   id: ReviewItemId
   /** Notion 페이지 혹은 문서의 제목 */
   title: string
+  /** 항목이 주로 소속된 Review Source ID */
+  sourceId: ReviewSourceId
   /** 연동된 Notion 데이터베이스 등의 원본 소스 명칭 */
   sourceName: string
   /** 화면에 표시할 정제된 카테고리 (값이 없을 경우 '미분류'로 자동 처리됨) */
@@ -54,6 +56,8 @@ export type TodayReviewFilter =
   | { kind: 'category'; value: string }
   /** 지정한 태그를 포함하고 있는 항목들만 필터링합니다. */
   | { kind: 'tag'; value: string }
+  /** 지정한 Review Source가 참조하는 항목들만 필터링합니다. */
+  | { kind: 'source'; sourceId: ReviewSourceId }
 
 /** 오늘 복습 큐에서 지원하는 정렬 옵션입니다. */
 export type TodayReviewSort = 'due' | 'random'
@@ -333,6 +337,8 @@ export function createTodayReviewService(
           filteredItems = filteredItems.filter((item) => item.category === filter.value)
         } else if (filter.kind === 'tag') {
           filteredItems = filteredItems.filter((item) => item.tags.includes(filter.value))
+        } else if (filter.kind === 'source') {
+          filteredItems = filteredItems.filter((item) => item.sourceIds.includes(filter.sourceId))
         }
       }
 
@@ -360,6 +366,7 @@ export function createTodayReviewService(
         return {
           id: item.id,
           title: item.title,
+          sourceId: item.primarySourceId,
           sourceName,
           displayCategory,
           tags,

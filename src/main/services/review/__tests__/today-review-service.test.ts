@@ -65,6 +65,7 @@ describe('TodayReviewService', () => {
     expect(result.items[0]).toEqual({
       id: item.id,
       title: item.title,
+      sourceId: item.primarySourceId,
       sourceName: '개발 학습',
       displayCategory: 'Electron',
       tags: ['desktop', 'security'],
@@ -228,6 +229,44 @@ describe('TodayReviewService', () => {
     const result = service.list({ now, timeZone: 'Asia/Seoul', filter })
 
     expect(result.items.map(({ id }) => id)).toEqual(expectedIds)
+  })
+
+  it('filters by any referenced Review Source without weakening Today Review rules', () => {
+    const sourceB = 'source-2' as typeof sourceId
+    const service = createTodayReviewService({
+      reader: createReader([
+        createReviewItem({
+          id: 'primary-source-match' as ReviewItemId,
+          primarySourceId: sourceB,
+          sourceIds: [sourceB]
+        }),
+        createReviewItem({
+          id: 'shared-source-match' as ReviewItemId,
+          sourceIds: [sourceId, sourceB]
+        }),
+        createReviewItem({
+          id: 'other-source' as ReviewItemId,
+          sourceIds: [sourceId]
+        }),
+        createReviewItem({
+          id: 'future-source-match' as ReviewItemId,
+          primarySourceId: sourceB,
+          sourceIds: [sourceB],
+          dueAt: '2026-06-11T15:00:00.000Z' as DateTimeString
+        })
+      ])
+    })
+
+    const result = service.list({
+      now,
+      timeZone: 'Asia/Seoul',
+      filter: { kind: 'source', sourceId: sourceB }
+    })
+
+    expect(result.items.map(({ id }) => id)).toEqual([
+      'primary-source-match',
+      'shared-source-match'
+    ])
   })
 
   it('rejects invalid dates and time zones before querying storage', () => {

@@ -20,14 +20,21 @@ import {
 } from './services/notion/source-metadata'
 import { registerSourceMappingIpc } from './ipc/source-mapping'
 import { registerManualSyncIpc } from './ipc/manual-sync'
+import { registerReviewRatingIpc } from './ipc/review-rating'
 import { registerTodayReviewIpc } from './ipc/today-review'
 import { createCollectionEngine } from './services/collection'
 import { createDatabaseSyncPersistence } from './services/database'
 import { ProductionNotionPageQueryClient } from './services/notion/sync-query'
 import { createTodayReviewService } from './services/review'
 import { createFsrsEngine } from './services/scheduler/fsrs-engine'
+import { createSchedulingService } from './services/scheduler'
 import { createManualSyncService } from './services/synchronization'
-import type { DateTimeString, ReviewItemId, ReviewSourceId } from '../shared/domain/types'
+import type {
+  DateTimeString,
+  ReviewItemId,
+  ReviewLogId,
+  ReviewSourceId
+} from '../shared/domain/types'
 
 let database: DatabaseService | null = null
 
@@ -230,6 +237,21 @@ app.whenReady().then(() => {
     ipcMain,
     isValidSender,
     timeZone: 'Asia/Seoul'
+  })
+
+  const schedulingService = createSchedulingService({
+    engine: fsrsEngine,
+    persistence: {
+      findReviewItemById: (reviewItemId) => database!.reviewItems.findById(reviewItemId),
+      recordReview: (item, log) => database!.recordReview(item, log)
+    },
+    createReviewLogId: () => `log_${randomUUID()}` as ReviewLogId
+  })
+
+  registerReviewRatingIpc({
+    service: schedulingService,
+    ipcMain,
+    isValidSender
   })
 
   createWindow()

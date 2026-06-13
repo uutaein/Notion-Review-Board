@@ -50,17 +50,24 @@ describe('Today Review IPC boundary', () => {
     expect(service.list).toHaveBeenCalledWith({
       now: '2026-06-13T07:00:00.000Z',
       timeZone: 'Asia/Seoul',
-      sort: undefined
+      sort: undefined,
+      filter: undefined
     })
   })
 
-  it.each([[null], [[]], ['due'], [{ sort: 'created' }], [{ filter: 'secret' }]])(
-    'rejects invalid payload %#',
-    async (payload) => {
-      await expect(handlers['review:list-today']({}, payload)).rejects.toThrow('INVALID_PAYLOAD')
-      expect(service.list).not.toHaveBeenCalled()
-    }
-  )
+  it.each([
+    [null],
+    [[]],
+    ['due'],
+    [{ sort: 'created' }],
+    [{ filter: 'secret' }],
+    [{ filter: { kind: 'source' } }],
+    [{ filter: { kind: 'source', sourceId: '' } }],
+    [{ filter: { kind: 'source', sourceId: 'source-1', token: 'secret' } }]
+  ])('rejects invalid payload %#', async (payload) => {
+    await expect(handlers['review:list-today']({}, payload)).rejects.toThrow('INVALID_PAYLOAD')
+    expect(service.list).not.toHaveBeenCalled()
+  })
 
   it('accepts the explicit random sort option only through the exact payload', async () => {
     await handlers['review:list-today']({}, { sort: 'random' })
@@ -68,7 +75,22 @@ describe('Today Review IPC boundary', () => {
     expect(service.list).toHaveBeenCalledWith({
       now: '2026-06-13T07:00:00.000Z',
       timeZone: 'Asia/Seoul',
-      sort: 'random'
+      sort: 'random',
+      filter: undefined
+    })
+  })
+
+  it('accepts an exact source filter payload', async () => {
+    await handlers['review:list-today'](
+      {},
+      { sort: 'due', filter: { kind: 'source', sourceId: 'source-1' } }
+    )
+
+    expect(service.list).toHaveBeenCalledWith({
+      now: '2026-06-13T07:00:00.000Z',
+      timeZone: 'Asia/Seoul',
+      sort: 'due',
+      filter: { kind: 'source', sourceId: 'source-1' }
     })
   })
 

@@ -1,5 +1,5 @@
 import type { TodayReviewService, TodayReviewSort } from '../services/review'
-import type { DateTimeString } from '../../shared/domain/types'
+import type { DateTimeString, ReviewSourceId } from '../../shared/domain/types'
 
 export interface TodayReviewIpcDependencies {
   service: TodayReviewService
@@ -23,7 +23,64 @@ function sanitizeIpcError(error: unknown): Error {
   return sanitized
 }
 
-function validateListPayload(args: unknown[]): { sort?: TodayReviewSort } {
+function validateFilter(
+  filter: unknown
+):
+  | { kind: 'unclassified' }
+  | { kind: 'category'; value: string }
+  | { kind: 'tag'; value: string }
+  | { kind: 'source'; sourceId: ReviewSourceId }
+  | undefined {
+  if (filter === undefined) return undefined
+  if (!filter || typeof filter !== 'object' || Array.isArray(filter)) {
+    throw new Error('INVALID_PAYLOAD')
+  }
+
+  const kind = (filter as { kind?: unknown }).kind
+  if (kind === 'unclassified') {
+    if (Object.keys(filter).length !== 1) throw new Error('INVALID_PAYLOAD')
+    return { kind }
+  }
+
+  if (kind === 'category' || kind === 'tag') {
+    const keys = Object.keys(filter)
+    const value = (filter as { value?: unknown }).value
+    if (
+      keys.length !== 2 ||
+      !keys.includes('kind') ||
+      !keys.includes('value') ||
+      typeof value !== 'string' ||
+      value.trim() === '' ||
+      value.length > 128
+    ) {
+      throw new Error('INVALID_PAYLOAD')
+    }
+    return { kind, value }
+  }
+
+  if (kind === 'source') {
+    const keys = Object.keys(filter)
+    const sourceId = (filter as { sourceId?: unknown }).sourceId
+    if (
+      keys.length !== 2 ||
+      !keys.includes('kind') ||
+      !keys.includes('sourceId') ||
+      typeof sourceId !== 'string' ||
+      sourceId.trim() === '' ||
+      sourceId.length > 64
+    ) {
+      throw new Error('INVALID_PAYLOAD')
+    }
+    return { kind, sourceId: sourceId as ReviewSourceId }
+  }
+
+  throw new Error('INVALID_PAYLOAD')
+}
+
+function validateListPayload(args: unknown[]): {
+  sort?: TodayReviewSort
+  filter?: ReturnType<typeof validateFilter>
+} {
   if (args.length === 0) return {}
   if (args.length !== 1) throw new Error('INVALID_PAYLOAD')
 
@@ -33,17 +90,16 @@ function validateListPayload(args: unknown[]): { sort?: TodayReviewSort } {
   }
 
   const keys = Object.keys(payload)
-  if (keys.some((key) => key !== 'sort')) {
+  if (keys.some((key) => key !== 'sort' && key !== 'filter')) {
     throw new Error('INVALID_PAYLOAD')
   }
 
   const sort = (payload as { sort?: unknown }).sort
-  if (sort === undefined) return {}
-  if (sort !== 'due' && sort !== 'random') {
+  if (sort !== undefined && sort !== 'due' && sort !== 'random') {
     throw new Error('INVALID_PAYLOAD')
   }
 
-  return { sort }
+  return { sort, filter: validateFilter((payload as { filter?: unknown }).filter) }
 }
 
 export function registerTodayReviewIpc(dependencies: TodayReviewIpcDependencies): void {
@@ -67,7 +123,8 @@ export function registerTodayReviewIpc(dependencies: TodayReviewIpcDependencies)
       return service.list({
         now: (now ? now() : new Date().toISOString()) as DateTimeString,
         timeZone,
-        sort: payload.sort
+        sort: payload.sort,
+        filter: payload.filter
       })
     })
   )

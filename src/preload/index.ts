@@ -54,10 +54,24 @@ const manualSync = {
 }
 
 const todayReview = {
-  list: (payload?: { sort?: 'due' | 'random' }): Promise<any> =>
+  list: (payload?: {
+    sort?: 'due' | 'random'
+    filter?:
+      | { kind: 'unclassified' }
+      | { kind: 'category'; value: string }
+      | { kind: 'tag'; value: string }
+      | { kind: 'source'; sourceId: string }
+  }): Promise<any> =>
     payload
       ? ipcRenderer.invoke('review:list-today', payload)
       : ipcRenderer.invoke('review:list-today')
+}
+
+const reviewRating = {
+  rate: (payload: {
+    reviewItemId: string
+    rating: 'again' | 'hard' | 'good' | 'easy'
+  }): Promise<any> => ipcRenderer.invoke('review:rate', payload)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
@@ -66,3 +80,4 @@ contextBridge.exposeInMainWorld('reviewSource', reviewSource)
 contextBridge.exposeInMainWorld('notionMetadata', notionMetadata)
 contextBridge.exposeInMainWorld('manualSync', manualSync)
 contextBridge.exposeInMainWorld('todayReview', todayReview)
+contextBridge.exposeInMainWorld('reviewRating', reviewRating)

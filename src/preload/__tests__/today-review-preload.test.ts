@@ -41,10 +41,12 @@ describe('Today Review preload API', () => {
 
     await api.list()
     await api.list({ sort: 'random' })
+    await api.list({ sort: 'due', filter: { kind: 'source', sourceId: 'source-1' } })
 
     expect(invoke.mock.calls).toEqual([
       ['review:list-today'],
-      ['review:list-today', { sort: 'random' }]
+      ['review:list-today', { sort: 'random' }],
+      ['review:list-today', { sort: 'due', filter: { kind: 'source', sourceId: 'source-1' } }]
     ])
   })
 })

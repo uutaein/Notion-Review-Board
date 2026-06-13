@@ -2,8 +2,10 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
+import { useReviewRating } from './composables/useReviewRating'
 import { useReviewSourceSettings } from './composables/useReviewSourceSettings'
 import { useTodayReview } from './composables/useTodayReview'
+import type { ReviewRating } from '../../shared/review-rating'
 
 type AppView = 'today-review' | 'notion-integration'
 
@@ -15,8 +17,15 @@ const {
   selectedItem,
   message: todayReviewMessage,
   dueLabel,
-  load: loadTodayReview
+  load: loadTodayReview,
+  setSourceFilter,
+  removeItem: removeTodayReviewItem
 } = useTodayReview(window.todayReview)
+const {
+  message: reviewRatingMessage,
+  isPending: isRatingPending,
+  rate: rateReview
+} = useReviewRating(window.reviewRating)
 const {
   tokenInput,
   status: notionStatus,
@@ -86,17 +95,31 @@ const remainingReviewCount = computed(() => reviewItems.value.length)
 
 async function syncAll(): Promise<void> {
   await runSyncAll()
-  await loadTodayReview()
+  await setSourceFilter(null)
 }
 
 async function syncSelected(): Promise<void> {
   await runSyncSelected()
-  await loadTodayReview()
+  await setSourceFilter(selectedSourceId.value || null)
+}
+
+async function changeSelectedSyncSource(): Promise<void> {
+  await setSourceFilter(selectedSourceId.value || null)
 }
 
 async function openSelectedItem(): Promise<void> {
   if (selectedItem.value?.notionUrl) {
     await window.electronAPI.openExternal(selectedItem.value.notionUrl)
+  }
+}
+
+async function rateSelectedItem(rating: ReviewRating): Promise<void> {
+  if (!selectedItem.value) return
+  const reviewedItemId = selectedItem.value.id
+  const success = await rateReview(reviewedItemId, rating)
+  if (success) {
+    await loadTodayReview()
+    removeTodayReviewItem(reviewedItemId)
   }
 }
 
@@ -238,6 +261,14 @@ onUnmounted(disposeSync)
                 {{ source.name }}
               </option>
             </select>
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="isSyncRunning || !selectedSourceId"
+              @click="changeSelectedSyncSource"
+            >
+              선택 Source 보기
+            </button>
             <button
               class="secondary-button"
               :disabled="isSyncRunning || !selectedSourceId"
@@ -584,12 +615,35 @@ onUnmounted(disposeSync)
           </div>
 
           <div class="rating-bar">
-            <span>얼마나 잘 기억했나요?</span>
+            <span>{{ reviewRatingMessage || '얼마나 잘 기억했나요?' }}</span>
             <div>
-              <button class="again">다시</button>
-              <button>어려움</button>
-              <button class="good">보통</button>
-              <button class="easy">쉬움</button>
+              <button
+                class="again"
+                :disabled="!selectedItem || isRatingPending"
+                @click="rateSelectedItem('again')"
+              >
+                다시
+              </button>
+              <button
+                :disabled="!selectedItem || isRatingPending"
+                @click="rateSelectedItem('hard')"
+              >
+                어려움
+              </button>
+              <button
+                class="good"
+                :disabled="!selectedItem || isRatingPending"
+                @click="rateSelectedItem('good')"
+              >
+                보통
+              </button>
+              <button
+                class="easy"
+                :disabled="!selectedItem || isRatingPending"
+                @click="rateSelectedItem('easy')"
+              >
+                쉬움
+              </button>
             </div>
           </div>
         </div>

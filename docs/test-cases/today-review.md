@@ -8,7 +8,7 @@ This test set covers `feature/today-review/today-review.feature`:
 - SRS-FR-051: required item display information
 - SRS-FR-052: due-date ordering
 - SRS-FR-053: explicit random ordering
-- SRS-FR-054: category, tag, and unclassified filtering
+- SRS-FR-054: category, tag, Source, and unclassified filtering
 
 Kanban is tagged `@p1` and document viewing is a separate feature, so their behavior is not part of
 this branch.
@@ -27,7 +27,7 @@ The reader contract must provide:
 - `findDue(through)`
 - `findSourceById(id)`
 
-Default sort is `due`. Supported filters are `unclassified`, `category`, and `tag`.
+Default sort is `due`. Supported filters are `unclassified`, `category`, `tag`, and `source`.
 
 ## Executable Cases
 
@@ -48,6 +48,7 @@ Default sort is `due`. Supported filters are `unclassified`, `category`, and `ta
 | TC-REVIEW-013 | FR-050 | Invalid date and time-zone input is rejected before storage access |
 | TC-REVIEW-014 | FR-050 | SQLite query includes the final millisecond of the local day |
 | TC-REVIEW-015 | FR-050/071 | Moving dueAt to a future day removes the item from Today Review |
+| TC-REVIEW-016 | FR-054 | Source filtering selects items whose `sourceIds` include the selected Source |
 
 ## UI Cases To Add With The Review Components
 
@@ -63,6 +64,7 @@ Default sort is `due`. Supported filters are `unclassified`, `category`, and `ta
 | TC-REVIEW-UI-008 | FR-054 | Empty filter result shows a filter-specific empty state |
 | TC-REVIEW-UI-009 | FR-071 | Successful rating removes a newly future-due item |
 | TC-REVIEW-UI-010 | FR-071 | Pending rating disables duplicate submission |
+| TC-REVIEW-UI-011 | FR-054 | Selecting a Source from the Manual Sync controls shows only eligible items for that Source |
 
 ## Implementation Guardrails
 

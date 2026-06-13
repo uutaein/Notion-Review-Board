@@ -1,8 +1,13 @@
 import { computed, ref } from 'vue'
-import type { TodayReviewItemDto, TodayReviewListResultDto } from '../../../shared/today-review'
+import type {
+  TodayReviewItemDto,
+  TodayReviewListFilterDto,
+  TodayReviewListInputDto,
+  TodayReviewListResultDto
+} from '../../../shared/today-review'
 
 export interface TodayReviewRendererApi {
-  list: (payload?: { sort?: 'due' | 'random' }) => Promise<TodayReviewListResultDto>
+  list: (payload?: TodayReviewListInputDto) => Promise<TodayReviewListResultDto>
 }
 
 type TodayReviewUiState = 'idle' | 'loading' | 'error'
@@ -34,6 +39,7 @@ export function useTodayReview(api: TodayReviewRendererApi) {
   const selectedId = ref<string | null>(null)
   const state = ref<TodayReviewUiState>('idle')
   const message = ref('')
+  const sourceFilterId = ref<string | null>(null)
 
   const selectedItem = computed(
     () => items.value.find((item) => item.id === selectedId.value) ?? items.value[0] ?? null
@@ -42,7 +48,10 @@ export function useTodayReview(api: TodayReviewRendererApi) {
   async function load(): Promise<void> {
     state.value = 'loading'
     try {
-      const result = await api.list({ sort: 'due' })
+      const filter: TodayReviewListFilterDto | undefined = sourceFilterId.value
+        ? { kind: 'source', sourceId: sourceFilterId.value }
+        : undefined
+      const result = await api.list({ sort: 'due', filter })
       items.value = result.items
       if (!items.value.some((item) => item.id === selectedId.value)) {
         selectedId.value = items.value[0]?.id ?? null
@@ -58,13 +67,32 @@ export function useTodayReview(api: TodayReviewRendererApi) {
     }
   }
 
+  async function setSourceFilter(sourceId: string | null): Promise<void> {
+    sourceFilterId.value = sourceId
+    selectedId.value = null
+    await load()
+  }
+
+  function removeItem(reviewItemId: string): void {
+    items.value = items.value.filter((item) => item.id !== reviewItemId)
+    if (selectedId.value === reviewItemId) {
+      selectedId.value = items.value[0]?.id ?? null
+    }
+    if (items.value.length === 0) {
+      message.value = '오늘 복습할 항목이 없습니다. Source를 동기화하면 새 항목이 표시됩니다.'
+    }
+  }
+
   return {
     items,
     selectedId,
     selectedItem,
+    sourceFilterId,
     state,
     message,
     dueLabel,
-    load
+    load,
+    setSourceFilter,
+    removeItem
   }
 }
