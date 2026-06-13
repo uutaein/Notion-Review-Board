@@ -98,10 +98,20 @@
   sync-all completion displays counts and Source status, and no horizontal overflow occurs at
   1440px.
 - Full regression now passes 18 files and 242 tests; production build passes.
+- Implemented Notion connection settings UI on the main screen with a masked token input, explicit
+  save, connection verification, confirmed deletion, pending-state duplicate prevention, and
+  sanitized user messages.
+- Added shared Notion connection status type in `src/shared/notion-connection.ts`.
+- Renderer Notion connection state-model tests cover TC-NOTION-CONN-UI-001 ~ 010 across 1 file and
+  12 tests.
+- Mock-preload browser verification confirmed password input, token clearing after save, no token
+  text in rendered UI, and connected-state display after verification.
+- Full regression now passes 19 files and 254 tests; production build passes.
 
 ## Next Action
 
-- Add live Electron/manual end-to-end verification with a real or controlled Notion sync fixture.
+- Use the UI to save and verify the provided Notion API key, then register a real Notion Source.
+- Run live Electron/manual end-to-end sync verification with the user-provided Notion database.
 - Consider adding component-level DOM automation if renderer test dependencies are introduced.
 
 ## Open Questions
@@ -120,6 +130,8 @@
   failed Source rolls back, and already committed Sources remain preserved.
 - Manual Sync renderer behavior is implemented and mock-browser verified; live Electron/Notion
   end-to-end verification has not been performed.
+- Notion token settings UI is implemented and mock-browser verified; actual token save/verify
+  against the user's workspace still needs live Electron verification.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
 

@@ -151,18 +151,38 @@ h1 {
 }
 
 .sync-button:disabled,
+.connection-controls button:disabled,
+.connection-controls input:disabled,
 .source-sync-controls button:disabled,
 .source-sync-controls select:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
+.connection-panel,
 .sync-panel {
   margin-top: 22px;
   padding: 16px 18px;
   border: 1px solid #dfe1d9;
   border-radius: 12px;
   background: #fafbf8;
+}
+
+.connection-panel.is-connected {
+  border-color: #c7db8a;
+  background: #fbfdf5;
+}
+
+.connection-panel.is-unauthorized,
+.connection-panel.is-forbidden,
+.connection-panel.is-network_error {
+  border-color: #d9aaa3;
+  background: #fff8f6;
+}
+
+.connection-panel.is-rate_limited {
+  border-color: #d9c99d;
+  background: #fffcf3;
 }
 
 .sync-panel.is-error {
@@ -175,6 +195,7 @@ h1 {
   background: #fffcf3;
 }
 
+.connection-panel,
 .sync-controls,
 .sync-status,
 .source-results li {
@@ -184,17 +205,21 @@ h1 {
   gap: 14px;
 }
 
+.connection-copy p,
 .sync-controls p {
   margin: 4px 0 0;
   color: #73786e;
   font-size: 12px;
 }
 
+.connection-controls,
 .source-sync-controls {
   display: flex;
   gap: 8px;
 }
 
+.connection-controls input,
+.connection-controls button,
 .source-sync-controls select,
 .source-sync-controls button {
   min-height: 36px;
@@ -204,14 +229,25 @@ h1 {
   font-size: 12px;
 }
 
+.connection-controls input {
+  width: 260px;
+  padding: 0 10px;
+}
+
 .source-sync-controls select {
   min-width: 160px;
   padding: 0 10px;
 }
 
+.connection-controls button,
 .source-sync-controls button {
   padding: 0 12px;
   cursor: pointer;
+}
+
+.connection-controls .danger-button {
+  color: #9b4e45;
+  border-color: #d9aaa3;
 }
 
 .source-sync-controls .cancel-button {
@@ -487,8 +523,13 @@ h1 {
     grid-template-columns: 210px 1fr;
   }
 
+  .connection-panel,
   .sync-controls {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .connection-controls {
+    flex-wrap: wrap;
   }
 }

@@ -39,7 +39,7 @@ steps, so a Feature file alone is not executable verification.
 
 | PRD                     | SRS                                       | Feature                                                                                                          | TC                                                                                                                 | Code and automated test evidence                                                                                                                                                                                                                                            | Status             |
 | ----------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| 7.1 Notion 연동 설정    | SRS-FR-001 ~ 003; SRS-NFR-SEC-006/008/010 | `feature/notion-connection/notion-connection.feature`                                                            | `docs/test-cases/notion-connection.md`; TC-NOTION-CONN-001 ~ 026                                                   | `src/main/services/notion/connection.ts`; `src/main/ipc/notion-connection.ts`; `src/preload/index.ts`; `src/main/services/notion/__tests__/notion-connection.test.ts`                                                                                                       | Backend Verified   |
+| 7.1 Notion 연동 설정    | SRS-FR-001 ~ 003; SRS-NFR-SEC-006/008/010 | `feature/notion-connection/notion-connection.feature`                                                            | `docs/test-cases/notion-connection.md`; TC-NOTION-CONN-001 ~ 026; TC-NOTION-CONN-UI-001 ~ 010                      | `src/main/services/notion/connection.ts`; `src/main/ipc/notion-connection.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useNotionConnection.ts`; backend, IPC, preload, renderer state-model, and mock-browser UI verification pass                            | Partially Verified |
 | 7.2 Review Source 등록  | SRS-FR-010 ~ 013                          | `feature/review-source/review-source.feature`                                                                    | `docs/test-cases/review-source-field-mapping.md`; TC-SOURCE-001 ~ 027; TC-SOURCE-IPC-001 ~ 005                     | `src/main/services/source/index.ts`; `src/main/ipc/source-mapping.ts`; `src/main/services/source/__tests__/source.test.ts`; `src/main/ipc/__tests__/source-mapping.test.ts`                                                                                                 | Partially Verified |
 | 7.3 필드 매핑           | SRS-FR-020 ~ 022                          | `feature/field-mapping/field-mapping.feature`                                                                    | `docs/test-cases/review-source-field-mapping.md`; TC-MAPPING-001 ~ 016; TC-SOURCE-IPC-001 ~ 005                    | `src/main/services/notion/source-metadata.ts`; `src/main/ipc/source-mapping.ts`; `src/main/services/notion/__tests__/source-metadata.test.ts`; `src/main/ipc/__tests__/source-mapping.test.ts`                                                                              | Partially Verified |
 | 7.4 복습 대상 수집 기준 | SRS-FR-030 ~ 032                          | `feature/collection-rules/collection-rules.feature`                                                              | `docs/test-cases/manual-sync-collection-engine.md`; TC-COLLECTION-001 ~ 018                                        | `src/main/services/collection/index.ts`; Collection Engine and Manual Sync target-selection tests pass                                                                                                                                                                      | Backend Verified   |
@@ -56,21 +56,22 @@ steps, so a Feature file alone is not executable verification.
 
 ## Supporting Traceability
 
-| PRD                       | SRS                                                   | Code/Test                                                                                                                 | Status             |
-| ------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| 8 데이터 모델 방향        | SRS sections 7 and 8                                  | `src/shared/domain/*.ts`; `src/main/services/database/*.ts`; domain/database tests                                        | Partially Verified |
-| 9 비즈니스 규칙           | SRS sections 6 and 8                                  | `src/shared/domain/*.ts`; `src/shared/domain/__tests__/domain.test.ts`                                                    | Partially Verified |
-| 10.1 Electron 데스크톱 앱 | SRS section 5; SRS-NFR-SEC-001 ~ 005                  | `src/main/index.ts`; `src/preload/index.ts`; Manual Sync composition and narrow preload tests pass                        | Partially Verified |
-| 10.2 SQLite 저장          | SRS section 7; SRS-NFR-REL-002/005; SRS-NFR-MAINT-003 | `src/main/services/database/*.ts`; database integration tests                                                             | Partially Verified |
-| 10.3 Notion API 제약      | SRS-FR-041/042; SRS-NFR-REL-003                       | Connection, metadata, and sync query clients exist; pagination, Retry-After, cancellation, and sanitized error tests pass | Backend Verified   |
-| 10.4 Notion 토큰 저장     | SRS-FR-001 ~ 003; SRS-NFR-SEC-006                     | Connection service and tests                                                                                              | Backend Verified   |
-| 11 주요 화면 방향         | SRS section 11; SRS-NFR-UX-001 ~ 005                  | `src/renderer/src/App.vue`; no mapped UI TC automation confirmed                                                          | Specified          |
-| 14 미확정 사항            | SRS-OPEN-001 ~ 010                                    | `docs/notion-review-board-srs-v0.1.md` section 15                                                                         | Open               |
+| PRD                       | SRS                                                   | Code/Test                                                                                                                   | Status             |
+| ------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 8 데이터 모델 방향        | SRS sections 7 and 8                                  | `src/shared/domain/*.ts`; `src/main/services/database/*.ts`; domain/database tests                                          | Partially Verified |
+| 9 비즈니스 규칙           | SRS sections 6 and 8                                  | `src/shared/domain/*.ts`; `src/shared/domain/__tests__/domain.test.ts`                                                      | Partially Verified |
+| 10.1 Electron 데스크톱 앱 | SRS section 5; SRS-NFR-SEC-001 ~ 005                  | `src/main/index.ts`; `src/preload/index.ts`; Manual Sync composition and narrow preload tests pass                          | Partially Verified |
+| 10.2 SQLite 저장          | SRS section 7; SRS-NFR-REL-002/005; SRS-NFR-MAINT-003 | `src/main/services/database/*.ts`; database integration tests                                                               | Partially Verified |
+| 10.3 Notion API 제약      | SRS-FR-041/042; SRS-NFR-REL-003                       | Connection, metadata, and sync query clients exist; pagination, Retry-After, cancellation, and sanitized error tests pass   | Backend Verified   |
+| 10.4 Notion 토큰 저장     | SRS-FR-001 ~ 003; SRS-NFR-SEC-006                     | Connection service, IPC, preload, renderer state-model tests, and mock-browser UI verification pass                         | Partially Verified |
+| 11 주요 화면 방향         | SRS section 11; SRS-NFR-UX-001 ~ 005                  | `src/renderer/src/App.vue`; Manual Sync and Notion connection panels have focused state-model tests and mock-browser checks | Partially Verified |
+| 14 미확정 사항            | SRS-OPEN-001 ~ 010                                    | `docs/notion-review-board-srs-v0.1.md` section 15                                                                           | Open               |
 
 ## Current Coverage Gaps
 
 | Gap                                                       | Required next artifact                                                 |
 | --------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Notion connection live verification is incomplete         | Save and verify the user token in the Electron UI                      |
 | Manual Sync live end-to-end verification is incomplete    | Verify Electron UI against a real or controlled Notion sync fixture    |
 | Document viewer has no dedicated TC set                   | Add security and fallback TC for SRS-FR-060 ~ 062                      |
 | Changed-page workflow has no dedicated TC set             | Add TC for SRS-FR-080 ~ 083                                            |
@@ -113,8 +114,15 @@ Verified on 2026-06-12:
 - Mock-preload browser verification confirms panel render, enabled Source selection, sync-all
   completion counts, Source status, and no 1440px horizontal overflow.
 - Full regression passes 18 files and 242 tests; production build passes.
+- Notion connection renderer state-model tests cover TC-NOTION-CONN-UI-001 ~ 010 in 1 file and 12
+  tests.
+- Mock-preload browser verification confirms password input, token clearing after save, no token
+  text in rendered UI, and connected-state display after verification.
+- Full regression passes 19 files and 254 tests; production build passes.
 - Manual Sync remains `Partially Verified` until live Electron/Notion end-to-end behavior is
   verified.
+- Notion connection remains `Partially Verified` until live Electron token save and verification are
+  completed.
 
 ## Maintenance Rule
 

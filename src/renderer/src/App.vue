@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useManualSync } from './composables/useManualSync'
+import { useNotionConnection } from './composables/useNotionConnection'
 
 type ReviewItem = {
   id: number
@@ -12,6 +13,20 @@ type ReviewItem = {
 
 const appVersion = ref('0.1.0')
 const selectedId = ref(1)
+const {
+  tokenInput,
+  status: notionStatus,
+  state: notionState,
+  message: notionMessage,
+  canSave: canSaveNotionToken,
+  canVerify: canVerifyNotionConnection,
+  canDelete: canDeleteNotionToken,
+  isBusy: isNotionConnectionBusy,
+  loadStatus: loadNotionStatus,
+  save: saveNotionToken,
+  verify: verifyNotionConnection,
+  deleteToken: deleteNotionToken
+} = useNotionConnection(window.notionConnection)
 const {
   enabledSources,
   selectedSourceId,
@@ -62,9 +77,15 @@ const selectedItem = computed(
   () => reviewItems.find((item) => item.id === selectedId.value) ?? reviewItems[0]
 )
 
+const confirmDeleteNotionToken = (): boolean => window.confirm('저장된 Notion 토큰을 삭제할까요?')
+
 onMounted(async () => {
   subscribeSyncProgress()
-  const [version] = await Promise.all([window.electronAPI.getAppVersion(), loadSources()])
+  const [version] = await Promise.all([
+    window.electronAPI.getAppVersion(),
+    loadSources(),
+    loadNotionStatus()
+  ])
   appVersion.value = version
 })
 
@@ -109,6 +130,43 @@ onUnmounted(disposeSync)
           {{ isSyncRunning ? '동기화 중' : '전체 동기화' }}
         </button>
       </header>
+
+      <section class="connection-panel" :class="`is-${notionStatus}`" aria-live="polite">
+        <div class="connection-copy">
+          <strong>Notion 연결</strong>
+          <p>{{ notionMessage }}</p>
+        </div>
+
+        <form class="connection-controls" @submit.prevent="saveNotionToken">
+          <input
+            v-model="tokenInput"
+            type="password"
+            autocomplete="off"
+            placeholder="Notion API key"
+            aria-label="Notion API key"
+            :disabled="isNotionConnectionBusy"
+          />
+          <button type="submit" :disabled="!canSaveNotionToken">
+            {{ notionState === 'saving' ? '저장 중' : '토큰 저장' }}
+          </button>
+          <button
+            type="button"
+            class="secondary-button"
+            :disabled="!canVerifyNotionConnection"
+            @click="verifyNotionConnection"
+          >
+            {{ notionState === 'verifying' ? '검증 중' : '연결 검증' }}
+          </button>
+          <button
+            type="button"
+            class="danger-button"
+            :disabled="!canDeleteNotionToken"
+            @click="deleteNotionToken(confirmDeleteNotionToken)"
+          >
+            삭제
+          </button>
+        </form>
+      </section>
 
       <section class="sync-panel" :class="`is-${syncState}`" aria-live="polite">
         <div class="sync-controls">

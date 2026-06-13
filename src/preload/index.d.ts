@@ -1,5 +1,6 @@
 import type { CollectionMode, FilterOperator } from '../shared/domain/source'
 import type { ManualSyncResult, SyncProgress } from '../shared/manual-sync'
+import type { NotionConnectionStatus } from '../shared/notion-connection'
 
 export type {
   ManualSyncResult,
@@ -14,10 +15,10 @@ export interface ElectronAPI {
 }
 
 export interface NotionConnectionAPI {
-  getStatus: () => Promise<string>
-  saveToken: (payload: { token: string }) => Promise<string>
-  deleteToken: () => Promise<string>
-  verify: () => Promise<string>
+  getStatus: () => Promise<NotionConnectionStatus>
+  saveToken: (payload: { token: string }) => Promise<NotionConnectionStatus>
+  deleteToken: () => Promise<NotionConnectionStatus>
+  verify: () => Promise<NotionConnectionStatus>
 }
 
 export interface CreateSourceInput {
