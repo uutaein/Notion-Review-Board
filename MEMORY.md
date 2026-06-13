@@ -194,10 +194,17 @@
 - Added renderer document viewer state handling, internal/external open buttons for Today Review
   items, stricter external opening for status items, and fixed the right panel so long document/detail
   content scrolls while rating/action controls remain fixed.
+- Adjusted the internal Document Viewer open flow so Electron `ERR_ABORTED` load interruptions from
+  Notion redirects/auth navigation do not surface as a failed open when the sandboxed viewer window
+  can still be shown.
+- Focused Document Viewer service, IPC, and renderer state-model verification passes 3 files and 25
+  tests after the redirect-abort handling change.
+- Full regression now passes 34 files and 376 tests; typecheck and production build pass.
 
 ## Next Action
 
-- Verify the live Electron internal document window against a real allowed Notion page.
+- Re-test the live Electron internal document window against a real allowed Notion page after the
+  `ERR_ABORTED` handling change.
 - Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing data.
 - Consider component-level DOM automation for the viewer layout if renderer test dependencies are
   introduced.
@@ -236,7 +243,8 @@
 - Missing/deleted status pages remain read-only. They intentionally do not implement deletion
   confirmation, recovery, archive, or history-preservation actions yet.
 - The internal Notion document viewer uses a sandboxed Electron BrowserWindow. Automated tests cover
-  the security options and URL policy, but live Notion rendering has not yet been manually verified.
+  the security options, URL policy, and Electron redirect-abort handling, but live Notion rendering
+  has not yet been manually verified after the latest fix.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
 - Current code uses `orphaned` status and `system-deleted` Source contrary to accepted ADR-015.

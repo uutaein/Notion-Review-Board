@@ -85,4 +85,73 @@ describe('Document Viewer URL policy', () => {
     expect(show).toHaveBeenCalled()
     expect(focus).toHaveBeenCalled()
   })
+
+  it('treats Electron redirect aborts as an opened internal viewer', async () => {
+    const loadURL = vi.fn().mockRejectedValue(new Error('ERR_ABORTED (-3) loading URL'))
+    const window = {
+      isDestroyed: vi.fn().mockReturnValue(false),
+      isVisible: vi.fn().mockReturnValue(false),
+      loadURL,
+      show: vi.fn(),
+      focus: vi.fn(),
+      close: vi.fn(),
+      on: vi.fn(),
+      once: vi.fn(),
+      webContents: {
+        on: vi.fn(),
+        setWindowOpenHandler: vi.fn()
+      }
+    }
+    class FakeBrowserWindow {
+      constructor() {
+        return window
+      }
+    }
+    const controller = createElectronDocumentViewerController({
+      getParentWindow: () => null,
+      shell: { openExternal: vi.fn() },
+      BrowserWindowClass: FakeBrowserWindow as never
+    })
+
+    await expect(
+      controller.open({ url: 'https://www.notion.so/workspace/Page-abc123' })
+    ).resolves.toEqual({
+      opened: true,
+      url: 'https://www.notion.so/workspace/Page-abc123'
+    })
+
+    expect(window.show).toHaveBeenCalled()
+    expect(window.focus).toHaveBeenCalled()
+  })
+
+  it('still rejects non-redirect internal viewer load failures', async () => {
+    const window = {
+      isDestroyed: vi.fn().mockReturnValue(false),
+      isVisible: vi.fn().mockReturnValue(false),
+      loadURL: vi.fn().mockRejectedValue(new Error('ERR_NAME_NOT_RESOLVED')),
+      show: vi.fn(),
+      focus: vi.fn(),
+      close: vi.fn(),
+      on: vi.fn(),
+      once: vi.fn(),
+      webContents: {
+        on: vi.fn(),
+        setWindowOpenHandler: vi.fn()
+      }
+    }
+    class FakeBrowserWindow {
+      constructor() {
+        return window
+      }
+    }
+    const controller = createElectronDocumentViewerController({
+      getParentWindow: () => null,
+      shell: { openExternal: vi.fn() },
+      BrowserWindowClass: FakeBrowserWindow as never
+    })
+
+    await expect(
+      controller.open({ url: 'https://www.notion.so/workspace/Page-abc123' })
+    ).rejects.toThrow('ERR_NAME_NOT_RESOLVED')
+  })
 })

@@ -48,6 +48,11 @@ export function normalizeNotionDocumentUrl(value: string): string {
   return trimmed
 }
 
+function isIgnorableLoadUrlError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : ''
+  return message.includes('ERR_ABORTED')
+}
+
 export function createElectronDocumentViewerController(
   dependencies: ElectronDocumentViewerDependencies
 ): DocumentViewerController {
@@ -90,7 +95,7 @@ export function createElectronDocumentViewerController(
 
     viewerWindow.webContents.setWindowOpenHandler(({ url }) => {
       if (isAllowedNotionDocumentUrl(url)) {
-        void viewerWindow?.loadURL(url)
+        void viewerWindow?.loadURL(url).catch(() => undefined)
       }
       return { action: 'deny' }
     })
@@ -106,7 +111,13 @@ export function createElectronDocumentViewerController(
     async open(input) {
       const url = normalizeNotionDocumentUrl(input.url)
       const window = ensureViewerWindow()
-      await window.loadURL(url)
+      try {
+        await window.loadURL(url)
+      } catch (error) {
+        if (!isIgnorableLoadUrlError(error)) {
+          throw error
+        }
+      }
       if (!window.isVisible()) window.show()
       window.focus()
       return { opened: true, url }
