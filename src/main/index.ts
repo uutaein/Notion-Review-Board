@@ -35,7 +35,8 @@ import type {
   DateTimeString,
   ReviewItemId,
   ReviewLogId,
-  ReviewSourceId
+  ReviewSourceId,
+  SyncEventId
 } from '../shared/domain/types'
 
 let database: DatabaseService | null = null
@@ -260,7 +261,12 @@ app.whenReady().then(() => {
     reader: {
       findByStatuses: (statuses) => database!.reviewItems.findByStatuses(statuses),
       findSourceById: (sourceId) => database!.reviewSources.findById(sourceId)
-    }
+    },
+    persistence: {
+      findReviewItemById: (reviewItemId) => database!.reviewItems.findById(reviewItemId),
+      recordStatusAction: (item, event) => database!.recordStatusAction(item, event)
+    },
+    createSyncEventId: () => `event_${randomUUID()}` as SyncEventId
   })
 
   registerStatusPagesIpc({

@@ -76,7 +76,11 @@ const reviewRating = {
 
 const statusPages = {
   list: (payload: { kind: 'changed' | 'missing-deleted' }): Promise<any> =>
-    ipcRenderer.invoke('status-pages:list', payload)
+    ipcRenderer.invoke('status-pages:list', payload),
+  handleChanged: (payload: {
+    reviewItemId: string
+    action: 'pull-today' | 'keep-schedule'
+  }): Promise<any> => ipcRenderer.invoke('status-pages:handle-changed', payload)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

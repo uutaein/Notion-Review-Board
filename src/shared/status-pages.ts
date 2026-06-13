@@ -28,3 +28,17 @@ export interface StatusPageListResultDto {
   items: StatusPageItemDto[]
   isEmpty: boolean
 }
+
+export type ChangedPageAction = 'pull-today' | 'keep-schedule'
+
+export interface HandleChangedPageInputDto {
+  reviewItemId: string
+  action: ChangedPageAction
+}
+
+export interface HandleChangedPageResultDto {
+  itemId: string
+  status: 'active'
+  dueAt: string
+  handledAt: string
+}

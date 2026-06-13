@@ -31,8 +31,10 @@ const {
   items: statusItems,
   selectedId: selectedStatusItemId,
   selectedItem: selectedStatusItem,
+  actionState: statusActionState,
   message: statusPageMessage,
-  load: loadStatusPage
+  load: loadStatusPage,
+  handleChanged: handleChangedPage
 } = useStatusPages(window.statusPages)
 const {
   tokenInput,
@@ -132,6 +134,14 @@ async function openSelectedItem(): Promise<void> {
 async function openSelectedStatusItem(): Promise<void> {
   if (selectedStatusItem.value?.notionUrl) {
     await window.electronAPI.openExternal(selectedStatusItem.value.notionUrl)
+  }
+}
+
+async function handleSelectedChangedPage(action: 'pull-today' | 'keep-schedule'): Promise<void> {
+  if (!selectedStatusItem.value || selectedStatusItem.value.status !== 'changed') return
+  const success = await handleChangedPage(selectedStatusItem.value.id, action)
+  if (success && action === 'pull-today') {
+    await loadTodayReview()
   }
 }
 
@@ -771,7 +781,24 @@ onUnmounted(disposeSync)
                 <dd>{{ selectedStatusItem.deletedDetectedAt }}</dd>
               </div>
             </dl>
-            <p v-else>{{ statusPageMessage }}</p>
+            <div v-if="selectedStatusItem?.status === 'changed'" class="status-actions">
+              <button
+                type="button"
+                :disabled="statusActionState === 'loading'"
+                @click="handleSelectedChangedPage('pull-today')"
+              >
+                오늘 복습으로 당기기
+              </button>
+              <button
+                type="button"
+                class="secondary-button"
+                :disabled="statusActionState === 'loading'"
+                @click="handleSelectedChangedPage('keep-schedule')"
+              >
+                기존 일정 유지
+              </button>
+            </div>
+            <p v-if="!selectedStatusItem">{{ statusPageMessage }}</p>
           </div>
         </div>
       </section>

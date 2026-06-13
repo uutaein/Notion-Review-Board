@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ReviewItem } from '../../../../shared/domain/item'
 import type { ReviewLog } from '../../../../shared/domain/log'
 import type { ReviewSource } from '../../../../shared/domain/source'
+import type { SyncEvent } from '../../../../shared/domain/sync'
 import type {
   DateTimeString,
   NotionPageId,
@@ -82,6 +83,19 @@ function log(): ReviewLog {
   }
 }
 
+function event(): SyncEvent {
+  return {
+    id: 'event-1' as SyncEvent['id'],
+    sourceId,
+    reviewItemId: itemId,
+    eventType: 'user_action',
+    severity: 'info',
+    message: 'Changed page kept on existing schedule',
+    technicalMessage: null,
+    occurredAt: now
+  }
+}
+
 describe('database service', () => {
   let database: DatabaseService
 
@@ -144,5 +158,24 @@ describe('database service', () => {
     expect(() => database.recordReview(invalidItem, log())).toThrow()
     expect(database.reviewLogs.findByItemId(itemId)).toEqual([])
     expect(database.reviewItems.findById(itemId)?.primarySourceId).toBe(sourceId)
+  })
+
+  it('stores a status action event and item update atomically', () => {
+    database.reviewItems.save({ ...item(), status: 'changed' })
+    const updatedItem = { ...item(), status: 'active' as const, updatedAt: now }
+
+    database.recordStatusAction(updatedItem, event())
+
+    expect(database.reviewItems.findById(itemId)?.status).toBe('active')
+    expect(database.syncEvents.findRecent(1)).toEqual([event()])
+  })
+
+  it('rolls back status action event when the item update fails', () => {
+    database.reviewItems.save({ ...item(), status: 'changed' })
+    const invalidItem = { ...item(), primarySourceId: 'missing-source' as ReviewSourceId }
+
+    expect(() => database.recordStatusAction(invalidItem, event())).toThrow()
+    expect(database.reviewItems.findById(itemId)?.status).toBe('changed')
+    expect(database.syncEvents.findRecent()).toEqual([])
   })
 })

@@ -29,7 +29,7 @@ describe('Status Pages preload API', () => {
     )
 
     const api = exposeInMainWorld.mock.calls.find(([name]) => name === 'statusPages')?.[1]
-    expect(Object.keys(api)).toEqual(['list'])
+    expect(Object.keys(api)).toEqual(['list', 'handleChanged'])
     expect(api).not.toHaveProperty('invoke')
     expect(api).not.toHaveProperty('database')
     expect(api).not.toHaveProperty('token')
@@ -41,10 +41,12 @@ describe('Status Pages preload API', () => {
 
     await api.list({ kind: 'changed' })
     await api.list({ kind: 'missing-deleted' })
+    await api.handleChanged({ reviewItemId: 'item-1', action: 'keep-schedule' })
 
     expect(invoke.mock.calls).toEqual([
       ['status-pages:list', { kind: 'changed' }],
-      ['status-pages:list', { kind: 'missing-deleted' }]
+      ['status-pages:list', { kind: 'missing-deleted' }],
+      ['status-pages:handle-changed', { reviewItemId: 'item-1', action: 'keep-schedule' }]
     ])
   })
 })

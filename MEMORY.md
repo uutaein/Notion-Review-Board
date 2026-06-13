@@ -176,15 +176,20 @@
   status lookup, and renderer state binding.
 - The status pages show title, Source, status, Notion Page ID, URL open action, dueAt, last review,
   last sync, Notion edit time, and missing/deleted detection timestamps without exposing FSRS state.
+- Added changed-page handling actions: `오늘 복습으로 당기기` sets the changed item back to active
+  with dueAt at the action timestamp, and `기존 일정 유지` sets the item back to active while
+  preserving dueAt and fsrsState.
+- Changed-page actions are persisted atomically with one `user_action` Sync Event and do not create
+  Review Logs.
 - Focused Status Pages service, IPC, preload, and renderer state-model verification passes 4 files
-  and 20 tests; full typecheck passes.
-- Full regression now passes 30 files and 326 tests; production build passes.
+  and 41 tests; full typecheck passes.
+- Full regression now passes 30 files and 349 tests; production build passes.
 
 ## Next Action
 
 - Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing
   data.
-- Define and implement changed-page actions: `오늘 복습으로 당기기` and `기존 일정 유지`.
+- Verify the live Electron UI for changed-page actions against real changed data.
 - Consider adding component-level DOM automation if renderer test dependencies are introduced.
 
 ## Open Questions
@@ -218,8 +223,8 @@
   rating against the user's synced data has not yet been manually confirmed.
 - Today Review Source filtering through the Manual Sync controls has focused automated coverage but
   still needs live Electron UI confirmation against the user's real Sources.
-- Changed and missing/deleted status pages are read-only. They intentionally do not implement state
-  transitions, deletion confirmation, recovery, archive, or history-preservation actions yet.
+- Missing/deleted status pages remain read-only. They intentionally do not implement deletion
+  confirmation, recovery, archive, or history-preservation actions yet.
 - The internal Notion document viewer remains a placeholder; selected items currently support
   external browser opening only.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files

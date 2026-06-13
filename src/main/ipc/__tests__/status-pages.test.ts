@@ -4,13 +4,19 @@ import { registerStatusPagesIpc } from '../status-pages'
 
 describe('Status Pages IPC boundary', () => {
   let handlers: Record<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>
-  let service: { list: ReturnType<typeof vi.fn> }
+  let service: { list: ReturnType<typeof vi.fn>; handleChanged: ReturnType<typeof vi.fn> }
   let isValidSender: ReturnType<typeof vi.fn<(event: unknown) => boolean>>
 
   beforeEach(() => {
     handlers = {}
     service = {
-      list: vi.fn().mockReturnValue({ kind: 'changed', items: [], isEmpty: true })
+      list: vi.fn().mockReturnValue({ kind: 'changed', items: [], isEmpty: true }),
+      handleChanged: vi.fn().mockReturnValue({
+        itemId: 'item-1',
+        status: 'active',
+        dueAt: '2026-06-13T07:00:00.000Z',
+        handledAt: '2026-06-13T07:00:00.000Z'
+      })
     }
     isValidSender = vi.fn<(event: unknown) => boolean>().mockReturnValue(true)
 
@@ -21,7 +27,8 @@ describe('Status Pages IPC boundary', () => {
           handlers[channel] = listener
         })
       },
-      isValidSender
+      isValidSender,
+      now: () => '2026-06-13T07:00:00.000Z'
     })
   })
 
@@ -68,5 +75,51 @@ describe('Status Pages IPC boundary', () => {
       message: 'INTERNAL_ERROR',
       stack: ''
     })
+  })
+
+  it.each([
+    [null],
+    [[]],
+    ['item-1'],
+    [{ reviewItemId: 'item-1' }],
+    [{ action: 'pull-today' }],
+    [{ reviewItemId: '', action: 'pull-today' }],
+    [{ reviewItemId: 'item-1', action: 'delete' }],
+    [{ reviewItemId: 'item-1', action: 'pull-today', token: 'secret' }]
+  ])('rejects invalid changed action payload %#', async (payload) => {
+    await expect(handlers['status-pages:handle-changed']({}, payload)).rejects.toThrow(
+      'INVALID_PAYLOAD'
+    )
+    expect(service.handleChanged).not.toHaveBeenCalled()
+  })
+
+  it('accepts exact changed action payloads with the fixed handled time', async () => {
+    await expect(
+      handlers['status-pages:handle-changed']({}, { reviewItemId: 'item-1', action: 'pull-today' })
+    ).resolves.toEqual({
+      itemId: 'item-1',
+      status: 'active',
+      dueAt: '2026-06-13T07:00:00.000Z',
+      handledAt: '2026-06-13T07:00:00.000Z'
+    })
+
+    expect(service.handleChanged).toHaveBeenCalledWith({
+      reviewItemId: 'item-1',
+      action: 'pull-today',
+      handledAt: '2026-06-13T07:00:00.000Z'
+    })
+  })
+
+  it('preserves public changed action errors', async () => {
+    service.handleChanged.mockImplementationOnce(() => {
+      throw new Error('STATUS_ITEM_NOT_CHANGED')
+    })
+
+    await expect(
+      handlers['status-pages:handle-changed'](
+        {},
+        { reviewItemId: 'item-1', action: 'keep-schedule' }
+      )
+    ).rejects.toMatchObject({ message: 'STATUS_ITEM_NOT_CHANGED', stack: '' })
   })
 })

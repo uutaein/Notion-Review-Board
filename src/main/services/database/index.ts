@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import type { ReviewItem } from '../../../shared/domain/item'
 import type { ReviewLog } from '../../../shared/domain/log'
+import type { SyncEvent } from '../../../shared/domain/sync'
 import { runMigrations } from './migrations'
 import {
   ReviewItemRepository,
@@ -17,6 +18,7 @@ export interface DatabaseService {
   reviewLogs: ReviewLogRepository
   syncEvents: SyncEventRepository
   recordReview(item: ReviewItem, log: ReviewLog): void
+  recordStatusAction(item: ReviewItem, event: SyncEvent): void
   close(): void
 }
 
@@ -58,6 +60,15 @@ export function createDatabaseService(path: string): DatabaseService {
     reviewLogs.save(log)
     reviewItems.save(item)
   })
+  const recordStatusActionTransaction = connection.transaction(
+    (item: ReviewItem, event: SyncEvent) => {
+      if (event.reviewItemId !== item.id) {
+        throw new Error('Review item and event IDs do not match')
+      }
+      reviewItems.save(item)
+      syncEvents.save(event)
+    }
+  )
 
   return {
     connection,
@@ -66,6 +77,7 @@ export function createDatabaseService(path: string): DatabaseService {
     reviewLogs,
     syncEvents,
     recordReview: (item, log) => recordReviewTransaction(item, log),
+    recordStatusAction: (item, event) => recordStatusActionTransaction(item, event),
     close: () => connection.close()
   }
 }
