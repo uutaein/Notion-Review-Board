@@ -21,6 +21,7 @@ import {
 import { registerSourceMappingIpc } from './ipc/source-mapping'
 import { registerManualSyncIpc } from './ipc/manual-sync'
 import { registerReviewRatingIpc } from './ipc/review-rating'
+import { registerStatusPagesIpc } from './ipc/status-pages'
 import { registerTodayReviewIpc } from './ipc/today-review'
 import { createCollectionEngine } from './services/collection'
 import { createDatabaseSyncPersistence } from './services/database'
@@ -28,6 +29,7 @@ import { ProductionNotionPageQueryClient } from './services/notion/sync-query'
 import { createTodayReviewService } from './services/review'
 import { createFsrsEngine } from './services/scheduler/fsrs-engine'
 import { createSchedulingService } from './services/scheduler'
+import { createStatusPageService } from './services/status-pages'
 import { createManualSyncService } from './services/synchronization'
 import type {
   DateTimeString,
@@ -250,6 +252,19 @@ app.whenReady().then(() => {
 
   registerReviewRatingIpc({
     service: schedulingService,
+    ipcMain,
+    isValidSender
+  })
+
+  const statusPageService = createStatusPageService({
+    reader: {
+      findByStatuses: (statuses) => database!.reviewItems.findByStatuses(statuses),
+      findSourceById: (sourceId) => database!.reviewSources.findById(sourceId)
+    }
+  })
+
+  registerStatusPagesIpc({
+    service: statusPageService,
     ipcMain,
     isValidSender
   })

@@ -2,6 +2,7 @@ import type { CollectionMode, FilterOperator } from '../shared/domain/source'
 import type { ManualSyncResult, SyncProgress } from '../shared/manual-sync'
 import type { NotionConnectionStatus } from '../shared/notion-connection'
 import type { RateReviewInputDto, RateReviewResultDto, ReviewRating } from '../shared/review-rating'
+import type { StatusPageListInputDto, StatusPageListResultDto } from '../shared/status-pages'
 import type { TodayReviewListInputDto, TodayReviewListResultDto } from '../shared/today-review'
 
 export type {
@@ -165,6 +166,10 @@ export interface ReviewRatingAPI {
   rate: (payload: RateReviewInputDto) => Promise<RateReviewResultDto>
 }
 
+export interface StatusPagesAPI {
+  list: (payload: StatusPageListInputDto) => Promise<StatusPageListResultDto>
+}
+
 export type { ReviewRating }
 
 declare global {
@@ -176,5 +181,6 @@ declare global {
     manualSync: ManualSyncAPI
     todayReview: TodayReviewAPI
     reviewRating: ReviewRatingAPI
+    statusPages: StatusPagesAPI
   }
 }

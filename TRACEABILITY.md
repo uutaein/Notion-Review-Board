@@ -32,7 +32,7 @@ steps, so a Feature file alone is not executable verification.
 | PRD        | `docs/notion-review-board-prd-v0.1.md` | Draft                                   |
 | SRS        | `docs/notion-review-board-srs-v0.1.md` | PRD v0.1 based draft                    |
 | Features   | `feature/**/*.feature`                 | Specification; Cucumber steps undefined |
-| Test cases | `docs/test-cases/*.md`                 | Five feature areas currently covered    |
+| Test cases | `docs/test-cases/*.md`                 | Six feature areas currently covered     |
 | Code       | `src/**`                               | Incremental implementation              |
 
 ## Functional Traceability
@@ -49,8 +49,8 @@ steps, so a Feature file alone is not executable verification.
 | 7.8 문서 뷰어           | SRS-FR-060 ~ 062; SRS-NFR-SEC-001 ~ 005   | `feature/document-viewer/document-viewer.feature`                                                                | No dedicated TC document                                                                                                   | No viewer implementation/test confirmed                                                                                                                                                                                                                                             | Specified          |
 | 7.9 복습 평가           | SRS-FR-070 ~ 072; SRS-NFR-REL-002         | `feature/review-scheduling/review-scheduling.feature`                                                            | `docs/test-cases/review-rating-fsrs.md`; TC-FSRS-001 ~ 016; TC-FSRS-UI-001 ~ 007                                           | `src/main/services/scheduler/index.ts`; `src/main/services/scheduler/fsrs-engine.ts`; `src/main/ipc/review-rating.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useReviewRating.ts`; scheduler, database, IPC, preload, and renderer state-model tests pass            | Partially Verified |
 | 7.10 칸반 보드          | SRS-FR-100                                | `feature/kanban-board/kanban-board.feature`                                                                      | No dedicated TC document                                                                                                   | No implementation/test confirmed                                                                                                                                                                                                                                                    | P1 Specified       |
-| 7.11 삭제된 페이지 화면 | SRS-FR-090 ~ 092                          | `feature/missing-deleted-pages/missing-deleted-pages.feature`                                                    | No dedicated TC document                                                                                                   | Status transition primitives exist in `src/shared/domain`, but feature implementation/test was not confirmed                                                                                                                                                                        | Specified          |
-| 7.12 변경된 페이지 화면 | SRS-FR-080 ~ 083                          | `feature/changed-pages/changed-pages.feature`                                                                    | No dedicated TC document                                                                                                   | Status primitives exist, but changed-page workflow implementation/test was not confirmed                                                                                                                                                                                            | Specified          |
+| 7.11 삭제된 페이지 화면 | SRS-FR-090 ~ 092                          | `feature/missing-deleted-pages/missing-deleted-pages.feature`                                                    | `docs/test-cases/status-pages.md`; TC-STATUS-002 ~ 004; TC-STATUS-IPC-001/002; TC-STATUS-UI-002                            | `src/main/services/status-pages/index.ts`; `src/main/ipc/status-pages.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useStatusPages.ts`; missing/deleted read-only list service, IPC, preload, and renderer state-model tests pass                                      | Partially Verified |
+| 7.12 변경된 페이지 화면 | SRS-FR-080 ~ 083                          | `feature/changed-pages/changed-pages.feature`                                                                    | `docs/test-cases/status-pages.md`; TC-STATUS-001/003/004; TC-STATUS-IPC-001/002; TC-STATUS-UI-001                          | `src/main/services/status-pages/index.ts`; `src/main/ipc/status-pages.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useStatusPages.ts`; changed read-only list service, IPC, preload, and renderer state-model tests pass; handling actions remain unimplemented       | Partially Verified |
 | 7.13 동기화             | SRS-FR-040 ~ 045; SRS-FR-093              | `feature/synchronization/synchronization.feature`; `feature/missing-deleted-pages/missing-deleted-pages.feature` | `docs/test-cases/manual-sync-collection-engine.md`; TC-SYNC-001 ~ 045; TC-SYNC-IPC-001 ~ 006; TC-SYNC-UI-001 ~ 010         | Manual Sync orchestration, Notion query mapping, finite Retry-After, cancellation, SQLite reconciliation, Main Process composition, privileged IPC, preload, renderer state-model tests, and mock-browser UI verification pass; live Electron/Notion E2E remains unverified         | Partially Verified |
 | 13.3 MVP 인수           | Cross-feature MVP requirements            | `feature/mvp-acceptance/mvp-acceptance.feature`                                                                  | No dedicated end-to-end TC document                                                                                        | No executable Cucumber steps or end-to-end test confirmed                                                                                                                                                                                                                           | Specified          |
 
@@ -69,19 +69,19 @@ steps, so a Feature file alone is not executable verification.
 
 ## Current Coverage Gaps
 
-| Gap                                                       | Required next artifact                                                                |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Notion connection live verification is incomplete         | Save and verify the user token in the Electron UI                                     |
-| Review Source live registration is incomplete             | Register the user's Notion DB/Data Source through the UI                              |
-| Manual Sync live end-to-end verification is incomplete    | Verify Electron UI against a real or controlled Notion sync fixture                   |
-| Today Review live display is incomplete                   | Verify synced real Notion pages appear in the Today Review list                       |
-| Document viewer has no dedicated TC set                   | Add security and fallback TC for SRS-FR-060 ~ 062                                     |
-| Changed-page workflow has no dedicated TC set             | Add TC for SRS-FR-080 ~ 083                                                           |
-| Missing/deleted workflow has no complete dedicated TC set | Add remaining TC for SRS-FR-090 ~ 092                                                 |
-| Renderer UI cases are documented but not automated        | Implement UI, then map UI test files to the existing `*-UI-*` cases                   |
-| Cucumber Features are not executable                      | Add step definitions only when executable BDD is intentionally adopted                |
-| MVP acceptance Feature has no end-to-end evidence         | Add an explicit MVP acceptance test strategy and executable cases                     |
-| ADR-015 Source deletion policy differs from current code  | Remove `orphaned`/`system-deleted`; add nullable Source and log snapshot migration TC |
+| Gap                                                      | Required next artifact                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Notion connection live verification is incomplete        | Save and verify the user token in the Electron UI                                     |
+| Review Source live registration is incomplete            | Register the user's Notion DB/Data Source through the UI                              |
+| Manual Sync live end-to-end verification is incomplete   | Verify Electron UI against a real or controlled Notion sync fixture                   |
+| Today Review live display is incomplete                  | Verify synced real Notion pages appear in the Today Review list                       |
+| Document viewer has no dedicated TC set                  | Add security and fallback TC for SRS-FR-060 ~ 062                                     |
+| Changed-page handling actions are incomplete             | Add/implement action TC for SRS-FR-082 ~ 083                                          |
+| Missing/deleted actions remain policy-blocked            | Close SRS-OPEN-003 before implementing confirmation/recovery/removal actions          |
+| Renderer UI cases are documented but not automated       | Implement UI, then map UI test files to the existing `*-UI-*` cases                   |
+| Cucumber Features are not executable                     | Add step definitions only when executable BDD is intentionally adopted                |
+| MVP acceptance Feature has no end-to-end evidence        | Add an explicit MVP acceptance test strategy and executable cases                     |
+| ADR-015 Source deletion policy differs from current code | Remove `orphaned`/`system-deleted`; add nullable Source and log snapshot migration TC |
 
 ## Verification Baseline
 
@@ -148,6 +148,9 @@ Verified on 2026-06-12:
   composition, pending-state duplicate prevention, sanitized renderer errors, and focused
   IPC/preload/renderer state-model tests. It remains `Partially Verified` until live Electron rating
   behavior is manually confirmed against synced data.
+- Status Pages now provide read-only `변경된 페이지` and `삭제된 페이지` lists through restricted IPC,
+  narrow preload exposure, a Main Process service, and renderer state-model tests. State-changing
+  actions are intentionally unimplemented pending separate TC and open deletion policy resolution.
 
 ## Maintenance Rule
 

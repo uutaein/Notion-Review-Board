@@ -12,7 +12,7 @@
 ## Current Phase
 
 - Phase: SRS → Feature → TC
-- Active Feature: review rating IPC/preload/renderer binding
+- Active Feature: changed and missing/deleted status pages
 - Active SRS IDs:
   - SRS-FR-050
   - SRS-FR-051
@@ -29,6 +29,8 @@
   - SRS-FR-070
   - SRS-FR-071
   - SRS-FR-072
+  - SRS-FR-081
+  - SRS-FR-092
   - SRS-FR-093
 
 ## Current Decision Summary
@@ -167,11 +169,22 @@
 - Focused Today Review service, IPC, preload, and renderer state-model verification passes 4 files
   and 36 tests after adding Source filtering.
 - Full regression now passes 26 files and 300 tests.
+- Added a read-only Status Pages path for `변경된 페이지` and `삭제된 페이지`.
+- Added `docs/test-cases/status-pages.md` for changed/missing/deleted list visibility while leaving
+  state-changing actions out of scope until deletion confirmation policy is closed.
+- Added restricted `status-pages:list` IPC, `statusPages.list` preload API, StatusPageService, SQLite
+  status lookup, and renderer state binding.
+- The status pages show title, Source, status, Notion Page ID, URL open action, dueAt, last review,
+  last sync, Notion edit time, and missing/deleted detection timestamps without exposing FSRS state.
+- Focused Status Pages service, IPC, preload, and renderer state-model verification passes 4 files
+  and 20 tests; full typecheck passes.
+- Full regression now passes 30 files and 326 tests; production build passes.
 
 ## Next Action
 
-- Use the live Electron UI to rate one Today Review item and confirm it disappears when FSRS moves
-  its next due date into the future.
+- Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing
+  data.
+- Define and implement changed-page actions: `오늘 복습으로 당기기` and `기존 일정 유지`.
 - Consider adding component-level DOM automation if renderer test dependencies are introduced.
 
 ## Open Questions
@@ -205,6 +218,8 @@
   rating against the user's synced data has not yet been manually confirmed.
 - Today Review Source filtering through the Manual Sync controls has focused automated coverage but
   still needs live Electron UI confirmation against the user's real Sources.
+- Changed and missing/deleted status pages are read-only. They intentionally do not implement state
+  transitions, deletion confirmation, recovery, archive, or history-preservation actions yet.
 - The internal Notion document viewer remains a placeholder; selected items currently support
   external browser opening only.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files

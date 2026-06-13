@@ -4,10 +4,11 @@ import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
 import { useReviewRating } from './composables/useReviewRating'
 import { useReviewSourceSettings } from './composables/useReviewSourceSettings'
+import { useStatusPages } from './composables/useStatusPages'
 import { useTodayReview } from './composables/useTodayReview'
 import type { ReviewRating } from '../../shared/review-rating'
 
-type AppView = 'today-review' | 'notion-integration'
+type AppView = 'today-review' | 'notion-integration' | 'changed-pages' | 'missing-deleted-pages'
 
 const appVersion = ref('0.1.0')
 const activeView = ref<AppView>('today-review')
@@ -26,6 +27,13 @@ const {
   isPending: isRatingPending,
   rate: rateReview
 } = useReviewRating(window.reviewRating)
+const {
+  items: statusItems,
+  selectedId: selectedStatusItemId,
+  selectedItem: selectedStatusItem,
+  message: statusPageMessage,
+  load: loadStatusPage
+} = useStatusPages(window.statusPages)
 const {
   tokenInput,
   status: notionStatus,
@@ -92,6 +100,9 @@ const {
 })
 
 const remainingReviewCount = computed(() => reviewItems.value.length)
+const activeStatusTitle = computed(() =>
+  activeView.value === 'changed-pages' ? '변경된 페이지' : '삭제된 페이지'
+)
 
 async function syncAll(): Promise<void> {
   await runSyncAll()
@@ -107,9 +118,20 @@ async function changeSelectedSyncSource(): Promise<void> {
   await setSourceFilter(selectedSourceId.value || null)
 }
 
+async function openStatusView(view: 'changed-pages' | 'missing-deleted-pages'): Promise<void> {
+  activeView.value = view
+  await loadStatusPage(view === 'changed-pages' ? 'changed' : 'missing-deleted')
+}
+
 async function openSelectedItem(): Promise<void> {
   if (selectedItem.value?.notionUrl) {
     await window.electronAPI.openExternal(selectedItem.value.notionUrl)
+  }
+}
+
+async function openSelectedStatusItem(): Promise<void> {
+  if (selectedStatusItem.value?.notionUrl) {
+    await window.electronAPI.openExternal(selectedStatusItem.value.notionUrl)
   }
 }
 
@@ -170,8 +192,20 @@ onUnmounted(disposeSync)
           <span>Notion 연동</span>
         </button>
         <button class="nav-item"><span>전체 큐</span></button>
-        <button class="nav-item"><span>변경된 페이지</span></button>
-        <button class="nav-item"><span>삭제된 페이지</span></button>
+        <button
+          class="nav-item"
+          :class="{ active: activeView === 'changed-pages' }"
+          @click="openStatusView('changed-pages')"
+        >
+          <span>변경된 페이지</span>
+        </button>
+        <button
+          class="nav-item"
+          :class="{ active: activeView === 'missing-deleted-pages' }"
+          @click="openStatusView('missing-deleted-pages')"
+        >
+          <span>삭제된 페이지</span>
+        </button>
       </nav>
 
       <div class="sidebar-bottom">
@@ -185,7 +219,15 @@ onUnmounted(disposeSync)
       <header class="topbar">
         <div>
           <p class="eyebrow">2026년 6월 11일</p>
-          <h1>{{ activeView === 'today-review' ? '오늘의 복습' : 'Notion 연동' }}</h1>
+          <h1>
+            {{
+              activeView === 'today-review'
+                ? '오늘의 복습'
+                : activeView === 'notion-integration'
+                  ? 'Notion 연동'
+                  : activeStatusTitle
+            }}
+          </h1>
         </div>
         <button
           v-if="activeView === 'today-review'"
@@ -645,6 +687,91 @@ onUnmounted(disposeSync)
                 쉬움
               </button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        v-if="activeView === 'changed-pages' || activeView === 'missing-deleted-pages'"
+        class="content-grid status-content-grid"
+      >
+        <div class="review-list">
+          <div class="section-heading">
+            <h2>{{ activeStatusTitle }}</h2>
+            <button>{{ statusItems.length }}개</button>
+          </div>
+
+          <div class="review-items">
+            <p v-if="statusItems.length === 0" class="empty-source">
+              {{ statusPageMessage }}
+            </p>
+
+            <button
+              v-for="item in statusItems"
+              :key="item.id"
+              class="review-card"
+              :class="{ selected: selectedStatusItemId === item.id }"
+              @click="selectedStatusItemId = item.id"
+            >
+              <span class="status-dot status-dot-warning"></span>
+              <span class="review-copy">
+                <strong>{{ item.title }}</strong>
+                <small
+                  >{{ item.sourceName }} · {{ item.displayCategory }} · {{ item.status }}</small
+                >
+              </span>
+              <span class="due-label">{{
+                item.notionLastEditedAt || item.lastSyncedAt || '-'
+              }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="viewer">
+          <div v-if="selectedStatusItem" class="viewer-toolbar">
+            <div>
+              <span class="tag">{{ selectedStatusItem.status }}</span>
+              <h2>{{ selectedStatusItem.title }}</h2>
+            </div>
+            <button @click="openSelectedStatusItem">외부에서 열기</button>
+          </div>
+
+          <div class="status-detail">
+            <dl v-if="selectedStatusItem">
+              <div>
+                <dt>Source</dt>
+                <dd>{{ selectedStatusItem.sourceName }}</dd>
+              </div>
+              <div>
+                <dt>Page ID</dt>
+                <dd>{{ selectedStatusItem.notionPageId }}</dd>
+              </div>
+              <div>
+                <dt>현재 dueAt</dt>
+                <dd>{{ selectedStatusItem.dueAt }}</dd>
+              </div>
+              <div>
+                <dt>마지막 복습</dt>
+                <dd>{{ selectedStatusItem.lastReviewedAt || '-' }}</dd>
+              </div>
+              <div>
+                <dt>마지막 동기화</dt>
+                <dd>{{ selectedStatusItem.lastSyncedAt || '-' }}</dd>
+              </div>
+              <div>
+                <dt>Notion 수정</dt>
+                <dd>{{ selectedStatusItem.notionLastEditedAt || '-' }}</dd>
+              </div>
+              <div v-if="selectedStatusItem.missingDetectedAt">
+                <dt>누락 감지</dt>
+                <dd>{{ selectedStatusItem.missingDetectedAt }}</dd>
+              </div>
+              <div v-if="selectedStatusItem.deletedDetectedAt">
+                <dt>삭제 감지</dt>
+                <dd>{{ selectedStatusItem.deletedDetectedAt }}</dd>
+              </div>
+            </dl>
+            <p v-else>{{ statusPageMessage }}</p>
           </div>
         </div>
       </section>

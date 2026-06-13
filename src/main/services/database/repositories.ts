@@ -209,6 +209,21 @@ export class ReviewItemRepository {
       .all(through)
       .map((row) => mapItem(row as Record<string, unknown>))
   }
+
+  findByStatuses(statuses: ReviewItem['status'][]): ReviewItem[] {
+    if (statuses.length === 0) return []
+    const placeholders = statuses.map(() => '?').join(', ')
+    return this.database
+      .prepare(
+        `
+        SELECT * FROM review_items
+        WHERE status IN (${placeholders})
+        ORDER BY updated_at DESC, id
+      `
+      )
+      .all(...statuses)
+      .map((row) => mapItem(row as Record<string, unknown>))
+  }
 }
 
 export class ReviewLogRepository {

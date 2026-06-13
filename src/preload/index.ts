@@ -74,6 +74,11 @@ const reviewRating = {
   }): Promise<any> => ipcRenderer.invoke('review:rate', payload)
 }
 
+const statusPages = {
+  list: (payload: { kind: 'changed' | 'missing-deleted' }): Promise<any> =>
+    ipcRenderer.invoke('status-pages:list', payload)
+}
+
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
 contextBridge.exposeInMainWorld('notionConnection', notionConnection)
 contextBridge.exposeInMainWorld('reviewSource', reviewSource)
@@ -81,3 +86,4 @@ contextBridge.exposeInMainWorld('notionMetadata', notionMetadata)
 contextBridge.exposeInMainWorld('manualSync', manualSync)
 contextBridge.exposeInMainWorld('todayReview', todayReview)
 contextBridge.exposeInMainWorld('reviewRating', reviewRating)
+contextBridge.exposeInMainWorld('statusPages', statusPages)
