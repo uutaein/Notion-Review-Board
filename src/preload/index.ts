@@ -83,6 +83,13 @@ const statusPages = {
   }): Promise<any> => ipcRenderer.invoke('status-pages:handle-changed', payload)
 }
 
+const documentViewer = {
+  open: (payload: { url: string }): Promise<any> =>
+    ipcRenderer.invoke('document-viewer:open', payload),
+  openExternal: (payload: { url: string }): Promise<any> =>
+    ipcRenderer.invoke('document-viewer:open-external', payload)
+}
+
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
 contextBridge.exposeInMainWorld('notionConnection', notionConnection)
 contextBridge.exposeInMainWorld('reviewSource', reviewSource)
@@ -91,3 +98,4 @@ contextBridge.exposeInMainWorld('manualSync', manualSync)
 contextBridge.exposeInMainWorld('todayReview', todayReview)
 contextBridge.exposeInMainWorld('reviewRating', reviewRating)
 contextBridge.exposeInMainWorld('statusPages', statusPages)
+contextBridge.exposeInMainWorld('documentViewer', documentViewer)

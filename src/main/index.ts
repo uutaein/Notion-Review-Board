@@ -23,6 +23,7 @@ import { registerManualSyncIpc } from './ipc/manual-sync'
 import { registerReviewRatingIpc } from './ipc/review-rating'
 import { registerStatusPagesIpc } from './ipc/status-pages'
 import { registerTodayReviewIpc } from './ipc/today-review'
+import { registerDocumentViewerIpc } from './ipc/document-viewer'
 import { createCollectionEngine } from './services/collection'
 import { createDatabaseSyncPersistence } from './services/database'
 import { ProductionNotionPageQueryClient } from './services/notion/sync-query'
@@ -30,6 +31,7 @@ import { createTodayReviewService } from './services/review'
 import { createFsrsEngine } from './services/scheduler/fsrs-engine'
 import { createSchedulingService } from './services/scheduler'
 import { createStatusPageService } from './services/status-pages'
+import { createElectronDocumentViewerController } from './services/document-viewer'
 import { createManualSyncService } from './services/synchronization'
 import type {
   DateTimeString,
@@ -271,6 +273,15 @@ app.whenReady().then(() => {
 
   registerStatusPagesIpc({
     service: statusPageService,
+    ipcMain,
+    isValidSender
+  })
+
+  registerDocumentViewerIpc({
+    controller: createElectronDocumentViewerController({
+      getParentWindow: () => BrowserWindow.getAllWindows()[0] ?? null,
+      shell
+    }),
     ipcMain,
     isValidSender
   })

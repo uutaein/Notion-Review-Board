@@ -32,7 +32,7 @@ steps, so a Feature file alone is not executable verification.
 | PRD        | `docs/notion-review-board-prd-v0.1.md` | Draft                                   |
 | SRS        | `docs/notion-review-board-srs-v0.1.md` | PRD v0.1 based draft                    |
 | Features   | `feature/**/*.feature`                 | Specification; Cucumber steps undefined |
-| Test cases | `docs/test-cases/*.md`                 | Six feature areas currently covered     |
+| Test cases | `docs/test-cases/*.md`                 | Seven feature areas currently covered   |
 | Code       | `src/**`                               | Incremental implementation              |
 
 ## Functional Traceability
@@ -46,7 +46,7 @@ steps, so a Feature file alone is not executable verification.
 | 7.5 통합 Review Queue   | SRS-FR-043 ~ 045                          | `feature/synchronization/synchronization.feature`; `feature/mvp-acceptance/mvp-acceptance.feature`               | `docs/test-cases/manual-sync-collection-engine.md`; TC-SYNC-022 ~ 042                                                      | `src/main/services/database/sync-persistence.ts`; SQLite tests cover create, update, schedule/log preservation, changed, missing, merge, idempotency, and rollback                                                                                                                  | Backend Verified   |
 | 7.6 오늘 복습 목록      | SRS-FR-050 ~ 054                          | `feature/today-review/today-review.feature`                                                                      | `docs/test-cases/today-review.md`; TC-REVIEW-001 ~ 016; TC-REVIEW-UI-001/002/011                                           | `src/main/services/review/index.ts`; `src/main/ipc/today-review.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useTodayReview.ts`; backend, IPC, preload, renderer state-model, Source filter, and database tests pass; live Electron/Notion display remains unverified | Partially Verified |
 | 7.7 목록 보기 방식      | SRS-FR-052 ~ 054                          | `feature/today-review/today-review.feature`                                                                      | `docs/test-cases/today-review.md`; TC-REVIEW-007 ~ 012; TC-REVIEW-UI-002                                                   | `src/main/services/review/index.ts`; `src/main/ipc/today-review.ts`; `src/renderer/src/composables/useTodayReview.ts`; due-sort service tests and renderer state-model tests pass; live UI display remains unverified                                                               | Partially Verified |
-| 7.8 문서 뷰어           | SRS-FR-060 ~ 062; SRS-NFR-SEC-001 ~ 005   | `feature/document-viewer/document-viewer.feature`                                                                | No dedicated TC document                                                                                                   | No viewer implementation/test confirmed                                                                                                                                                                                                                                             | Specified          |
+| 7.8 문서 뷰어           | SRS-FR-060 ~ 062; SRS-NFR-SEC-001 ~ 005   | `feature/document-viewer/document-viewer.feature`                                                                | `docs/test-cases/document-viewer.md`; TC-VIEWER-001 ~ 009; TC-VIEWER-UI-001 ~ 003                                          | `src/main/services/document-viewer/index.ts`; `src/main/ipc/document-viewer.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useDocumentViewer.ts`; URL policy, IPC, preload, and renderer state-model tests pass; live internal Notion rendering remains unverified      | Partially Verified |
 | 7.9 복습 평가           | SRS-FR-070 ~ 072; SRS-NFR-REL-002         | `feature/review-scheduling/review-scheduling.feature`                                                            | `docs/test-cases/review-rating-fsrs.md`; TC-FSRS-001 ~ 016; TC-FSRS-UI-001 ~ 007                                           | `src/main/services/scheduler/index.ts`; `src/main/services/scheduler/fsrs-engine.ts`; `src/main/ipc/review-rating.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useReviewRating.ts`; scheduler, database, IPC, preload, and renderer state-model tests pass            | Partially Verified |
 | 7.10 칸반 보드          | SRS-FR-100                                | `feature/kanban-board/kanban-board.feature`                                                                      | No dedicated TC document                                                                                                   | No implementation/test confirmed                                                                                                                                                                                                                                                    | P1 Specified       |
 | 7.11 삭제된 페이지 화면 | SRS-FR-090 ~ 092                          | `feature/missing-deleted-pages/missing-deleted-pages.feature`                                                    | `docs/test-cases/status-pages.md`; TC-STATUS-002 ~ 004; TC-STATUS-IPC-001/002; TC-STATUS-UI-002                            | `src/main/services/status-pages/index.ts`; `src/main/ipc/status-pages.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useStatusPages.ts`; missing/deleted read-only list service, IPC, preload, and renderer state-model tests pass                                      | Partially Verified |
@@ -75,7 +75,7 @@ steps, so a Feature file alone is not executable verification.
 | Review Source live registration is incomplete            | Register the user's Notion DB/Data Source through the UI                              |
 | Manual Sync live end-to-end verification is incomplete   | Verify Electron UI against a real or controlled Notion sync fixture                   |
 | Today Review live display is incomplete                  | Verify synced real Notion pages appear in the Today Review list                       |
-| Document viewer has no dedicated TC set                  | Add security and fallback TC for SRS-FR-060 ~ 062                                     |
+| Document viewer live rendering remains unverified        | Verify allowed Notion pages render in the internal Electron document window           |
 | Changed-page live handling remains unverified            | Verify pull-today and keep-schedule in Electron against real changed data             |
 | Missing/deleted actions remain policy-blocked            | Close SRS-OPEN-003 before implementing confirmation/recovery/removal actions          |
 | Renderer UI cases are documented but not automated       | Implement UI, then map UI test files to the existing `*-UI-*` cases                   |
@@ -152,6 +152,10 @@ Verified on 2026-06-12:
   restricted IPC, narrow preload exposure, a Main Process service, and renderer state-model tests.
   Missing/deleted state-changing actions remain unimplemented pending open deletion policy
   resolution.
+- Document Viewer now has dedicated TC coverage for SRS-FR-060 ~ 062 and a restricted
+  Notion-URL-only internal/external open path. Automated tests cover URL policy, sandboxed window
+  options, IPC validation, preload exposure, and renderer state messages. Live Notion content
+  rendering remains unverified.
 
 ## Maintenance Rule
 

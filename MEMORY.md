@@ -12,7 +12,7 @@
 ## Current Phase
 
 - Phase: SRS → Feature → TC
-- Active Feature: changed and missing/deleted status pages
+- Active Feature: document viewer
 - Active SRS IDs:
   - SRS-FR-050
   - SRS-FR-051
@@ -32,6 +32,9 @@
   - SRS-FR-081
   - SRS-FR-092
   - SRS-FR-093
+  - SRS-FR-060
+  - SRS-FR-061
+  - SRS-FR-062
 
 ## Current Decision Summary
 
@@ -184,13 +187,20 @@
 - Focused Status Pages service, IPC, preload, and renderer state-model verification passes 4 files
   and 41 tests; full typecheck passes.
 - Full regression now passes 30 files and 349 tests; production build passes.
+- Added `docs/test-cases/document-viewer.md` for SRS-FR-060 ~ 062.
+- Added a restricted Document Viewer path: Notion HTTPS URL allowlist, sandboxed internal Electron
+  document window with no preload/Node integration, stricter Notion-only external fallback IPC, and
+  narrow preload methods.
+- Added renderer document viewer state handling, internal/external open buttons for Today Review
+  items, stricter external opening for status items, and fixed the right panel so long document/detail
+  content scrolls while rating/action controls remain fixed.
 
 ## Next Action
 
-- Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing
-  data.
-- Verify the live Electron UI for changed-page actions against real changed data.
-- Consider adding component-level DOM automation if renderer test dependencies are introduced.
+- Verify the live Electron internal document window against a real allowed Notion page.
+- Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing data.
+- Consider component-level DOM automation for the viewer layout if renderer test dependencies are
+  introduced.
 
 ## Open Questions
 
@@ -225,8 +235,8 @@
   still needs live Electron UI confirmation against the user's real Sources.
 - Missing/deleted status pages remain read-only. They intentionally do not implement deletion
   confirmation, recovery, archive, or history-preservation actions yet.
-- The internal Notion document viewer remains a placeholder; selected items currently support
-  external browser opening only.
+- The internal Notion document viewer uses a sandboxed Electron BrowserWindow. Automated tests cover
+  the security options and URL policy, but live Notion rendering has not yet been manually verified.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
 - Current code uses `orphaned` status and `system-deleted` Source contrary to accepted ADR-015.

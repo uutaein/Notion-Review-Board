@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useDocumentViewer } from './composables/useDocumentViewer'
 import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
 import { useReviewRating } from './composables/useReviewRating'
@@ -27,6 +28,12 @@ const {
   isPending: isRatingPending,
   rate: rateReview
 } = useReviewRating(window.reviewRating)
+const {
+  state: documentViewerState,
+  message: documentViewerMessage,
+  open: openDocumentViewer,
+  openExternal: openDocumentExternal
+} = useDocumentViewer(window.documentViewer)
 const {
   items: statusItems,
   selectedId: selectedStatusItemId,
@@ -125,15 +132,21 @@ async function openStatusView(view: 'changed-pages' | 'missing-deleted-pages'): 
   await loadStatusPage(view === 'changed-pages' ? 'changed' : 'missing-deleted')
 }
 
-async function openSelectedItem(): Promise<void> {
+async function openSelectedItemInternal(): Promise<void> {
   if (selectedItem.value?.notionUrl) {
-    await window.electronAPI.openExternal(selectedItem.value.notionUrl)
+    await openDocumentViewer(selectedItem.value.notionUrl)
+  }
+}
+
+async function openSelectedItemExternal(): Promise<void> {
+  if (selectedItem.value?.notionUrl) {
+    await openDocumentExternal(selectedItem.value.notionUrl)
   }
 }
 
 async function openSelectedStatusItem(): Promise<void> {
   if (selectedStatusItem.value?.notionUrl) {
-    await window.electronAPI.openExternal(selectedStatusItem.value.notionUrl)
+    await openDocumentExternal(selectedStatusItem.value.notionUrl)
   }
 }
 
@@ -651,19 +664,35 @@ onUnmounted(disposeSync)
               <span class="tag">{{ selectedItem.displayCategory }}</span>
               <h2>{{ selectedItem.title }}</h2>
             </div>
-            <button @click="openSelectedItem">외부에서 열기</button>
+            <div class="viewer-actions">
+              <button
+                :disabled="documentViewerState === 'opening'"
+                @click="openSelectedItemInternal"
+              >
+                내부에서 열기
+              </button>
+              <button
+                :disabled="documentViewerState === 'opening'"
+                @click="openSelectedItemExternal"
+              >
+                외부에서 열기
+              </button>
+            </div>
           </div>
 
-          <div class="viewer-placeholder">
-            <span class="document-icon">N</span>
-            <h3>Notion 문서 뷰어</h3>
-            <p>
-              {{
-                selectedItem
-                  ? '선택한 페이지는 외부 브라우저로 열 수 있습니다.'
-                  : 'Source를 동기화하면 복습할 페이지가 표시됩니다.'
-              }}
-            </p>
+          <div class="viewer-body">
+            <div class="viewer-placeholder">
+              <span class="document-icon">N</span>
+              <h3>Notion 문서 뷰어</h3>
+              <p>
+                {{
+                  selectedItem
+                    ? documentViewerMessage ||
+                      '선택한 페이지를 내부 창 또는 외부 브라우저로 열 수 있습니다.'
+                    : 'Source를 동기화하면 복습할 페이지가 표시됩니다.'
+                }}
+              </p>
+            </div>
           </div>
 
           <div class="rating-bar">
@@ -743,7 +772,9 @@ onUnmounted(disposeSync)
               <span class="tag">{{ selectedStatusItem.status }}</span>
               <h2>{{ selectedStatusItem.title }}</h2>
             </div>
-            <button @click="openSelectedStatusItem">외부에서 열기</button>
+            <button :disabled="documentViewerState === 'opening'" @click="openSelectedStatusItem">
+              외부에서 열기
+            </button>
           </div>
 
           <div class="status-detail">

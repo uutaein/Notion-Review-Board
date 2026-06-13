@@ -578,6 +578,16 @@ h1 {
   font-size: 12px;
 }
 
+.viewer-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.viewer-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .review-items {
   min-height: 0;
   overflow-y: auto;
@@ -676,8 +686,29 @@ h1 {
 .viewer-placeholder {
   display: grid;
   place-content: center;
+  min-height: 100%;
   color: #858b81;
   text-align: center;
+}
+
+.viewer-body {
+  min-height: 0;
+  max-height: calc(100vh - 430px);
+  overflow-y: auto;
+  padding: 22px;
+  scrollbar-gutter: stable;
+}
+
+.viewer-body::-webkit-scrollbar,
+.status-detail::-webkit-scrollbar {
+  width: 8px;
+}
+
+.viewer-body::-webkit-scrollbar-thumb,
+.status-detail::-webkit-scrollbar-thumb {
+  border: 2px solid #fafbf8;
+  border-radius: 999px;
+  background: #c8cec1;
 }
 
 .document-icon {
@@ -705,6 +736,8 @@ h1 {
 }
 
 .status-detail {
+  min-height: 0;
+  max-height: calc(100vh - 430px);
   overflow-y: auto;
   padding: 22px;
 }
