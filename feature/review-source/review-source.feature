@@ -30,6 +30,19 @@
     만일 사용자가 같은 대상을 새 Source로 저장한다
     그러면 중복 Source 경고가 표시된다
 
+  @SRS-FR-010
+  시나리오 개요: 수집 방식의 조건부 필수값을 검증한다
+    조건 사용자가 Source 등록 화면을 열었다
+    그리고 수집 방식이 "<수집 방식>"이다
+    만일 "<조건부 필수값>" 없이 Source를 저장한다
+    그러면 Source는 저장되지 않는다
+    그리고 누락된 "<조건부 필수값>" 안내가 표시된다
+
+    예:
+      | 수집 방식       | 조건부 필수값             |
+      | 태그 또는 분류 기반 | 필터 속성과 연산자와 값     |
+      | 체크박스 기반     | 체크박스 속성 매핑          |
+
   @SRS-FR-011
   시나리오: Source 설정을 수정한다
     조건 Review Source와 해당 Source의 Review Log가 존재한다
@@ -45,6 +58,13 @@
     그리고 다른 Source의 Review Item 참조는 유지된다
     그리고 기존 Review Log는 유지된다
 
+  @SRS-FR-012
+  시나리오: 하나의 Source만 참조하는 항목의 처리 방식을 선택한다
+    조건 삭제할 Source만 참조하는 Review Item이 있다
+    만일 사용자가 Source 삭제를 요청한다
+    그러면 단독 참조 항목의 개수와 영향 범위가 표시된다
+    그리고 항목 처리 방식을 선택하기 전에는 Source를 삭제하지 않는다
+
   @SRS-FR-013
   시나리오: 비활성 Source를 동기화에서 제외한다
     조건 활성 Source와 비활성 Source가 각각 존재한다
@@ -52,3 +72,9 @@
     그러면 활성 Source만 동기화된다
     그리고 비활성 Source의 기존 Review Item은 삭제되지 않는다
 
+  @SRS-FR-013
+  시나리오: Source 비활성화가 기존 복습 일정에 영향을 주지 않는다
+    조건 활성 Source에서 수집된 active Review Item이 있다
+    만일 사용자가 Source를 비활성화한다
+    그러면 Review Item의 status와 dueAt은 유지된다
+    그리고 다음 수동 동기화 대상에서만 Source가 제외된다

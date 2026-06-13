@@ -86,6 +86,104 @@ const migrations: Migration[] = [
       CREATE INDEX idx_sync_events_occurred_at ON sync_events(occurred_at DESC);
       CREATE INDEX idx_sync_events_source_id ON sync_events(source_id);
     `
+  },
+  {
+    version: 2,
+    up: `
+      ALTER TABLE review_sources ADD COLUMN last_edited_property_name TEXT;
+    `
+  },
+  {
+    version: 3,
+    up: `
+      -- 1. review_sources 테이블에 deleted_at 컬럼 추가 (soft delete 지원)
+      ALTER TABLE review_sources ADD COLUMN deleted_at TEXT;
+
+      -- 2. review_items 테이블의 CHECK 제약조건에 'orphaned' 추가를 위한 리테이블링
+      CREATE TABLE review_items_new (
+        id TEXT PRIMARY KEY,
+        notion_page_id TEXT NOT NULL UNIQUE,
+        notion_url TEXT NOT NULL,
+        title TEXT NOT NULL,
+        primary_source_id TEXT NOT NULL REFERENCES review_sources(id),
+        source_ids_json TEXT NOT NULL,
+        due_at TEXT NOT NULL,
+        fsrs_state_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('active', 'changed', 'missing', 'deleted', 'sync_error', 'archived', 'orphaned')),
+        category TEXT,
+        tags_json TEXT NOT NULL,
+        origin_label TEXT,
+        last_reviewed_at TEXT,
+        notion_last_edited_at TEXT,
+        last_synced_at TEXT,
+        missing_detected_at TEXT,
+        deleted_detected_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- 데이터 이전
+      INSERT INTO review_items_new SELECT * FROM review_items;
+
+      -- 기존 테이블 및 인덱스 드롭
+      DROP INDEX IF EXISTS idx_review_items_due_at;
+      DROP TABLE review_items;
+
+      -- 새 테이블 이름 변경 및 인덱스 재생성
+      ALTER TABLE review_items_new RENAME TO review_items;
+      CREATE INDEX idx_review_items_due_at ON review_items(status, due_at);
+    `
+  },
+  {
+    version: 4,
+    up: `
+      -- 1. review_sources 테이블의 notion_target_id UNIQUE 제약조건을 제거하기 위해 새 테이블 생성
+      CREATE TABLE review_sources_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        notion_target_id TEXT NOT NULL,
+        notion_target_url TEXT,
+        notion_target_type TEXT NOT NULL CHECK (notion_target_type IN ('database', 'data_source', 'unknown')),
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        collection_mode TEXT NOT NULL CHECK (collection_mode IN ('tag', 'checkbox', 'all')),
+        title_property_name TEXT NOT NULL,
+        url_property_name TEXT,
+        category_property_name TEXT,
+        tag_property_name TEXT,
+        source_property_name TEXT,
+        review_checkbox_property_name TEXT,
+        filter_property_name TEXT,
+        filter_operator TEXT CHECK (filter_operator IN ('equals', 'contains', 'checked') OR filter_operator IS NULL),
+        filter_value TEXT,
+        last_synced_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_edited_property_name TEXT,
+        deleted_at TEXT
+      );
+
+      -- 2. 데이터 이전
+      INSERT INTO review_sources_new (
+        id, name, notion_target_id, notion_target_url, notion_target_type, enabled,
+        collection_mode, title_property_name, url_property_name, category_property_name,
+        tag_property_name, source_property_name, review_checkbox_property_name,
+        filter_property_name, filter_operator, filter_value, last_synced_at,
+        created_at, updated_at, last_edited_property_name, deleted_at
+      ) SELECT 
+        id, name, notion_target_id, notion_target_url, notion_target_type, enabled,
+        collection_mode, title_property_name, url_property_name, category_property_name,
+        tag_property_name, source_property_name, review_checkbox_property_name,
+        filter_property_name, filter_operator, filter_value, last_synced_at,
+        created_at, updated_at, last_edited_property_name, deleted_at
+      FROM review_sources;
+
+      -- 3. 기존 테이블 삭제 및 리네임
+      DROP TABLE review_sources;
+      ALTER TABLE review_sources_new RENAME TO review_sources;
+
+      -- 4. active인 소스들만 notion_target_id가 유니크하도록 partial index 생성
+      CREATE UNIQUE INDEX idx_review_sources_active_target ON review_sources(notion_target_id) WHERE deleted_at IS NULL;
+    `
   }
 ]
 
@@ -97,22 +195,30 @@ export function runMigrations(database: Database.Database): void {
     )
   `)
 
-  const appliedVersions = new Set(
-    database
-      .prepare('SELECT version FROM schema_migrations')
-      .all()
-      .map((row) => (row as { version: number }).version)
-  )
-  const applyMigration = database.transaction((migration: Migration) => {
-    database.exec(migration.up)
-    database
-      .prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)')
-      .run(migration.version, new Date().toISOString())
-  })
+  // 마이그레이션 도중 외래 키 제약 조건 비활성화 (테이블 리팩토링 시 필요)
+  database.pragma('foreign_keys = OFF')
 
-  for (const migration of migrations) {
-    if (!appliedVersions.has(migration.version)) {
-      applyMigration(migration)
+  try {
+    const appliedVersions = new Set(
+      database
+        .prepare('SELECT version FROM schema_migrations')
+        .all()
+        .map((row) => (row as { version: number }).version)
+    )
+    const applyMigration = database.transaction((migration: Migration) => {
+      database.exec(migration.up)
+      database
+        .prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)')
+        .run(migration.version, new Date().toISOString())
+    })
+
+    for (const migration of migrations) {
+      if (!appliedVersions.has(migration.version)) {
+        applyMigration(migration)
+      }
     }
+  } finally {
+    // 마이그레이션 완료 후 외래 키 제약 조건 활성화
+    database.pragma('foreign_keys = ON')
   }
 }

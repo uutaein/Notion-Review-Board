@@ -8,6 +8,7 @@ import {
   ReviewSourceRepository,
   SyncEventRepository
 } from './repositories'
+export { createDatabaseSyncPersistence } from './sync-persistence'
 
 export interface DatabaseService {
   connection: Database.Database
@@ -27,6 +28,24 @@ export function createDatabaseService(path: string): DatabaseService {
     connection.pragma('journal_mode = WAL')
   }
   runMigrations(connection)
+
+  // 시스템 기본 삭제 대피용 소스를 생성하여 삭제 시 외래 키 무결성을 지킵니다.
+  connection
+    .prepare(
+      `
+    INSERT OR IGNORE INTO review_sources (
+      id, name, notion_target_id, notion_target_url, notion_target_type, enabled,
+      collection_mode, title_property_name, url_property_name, category_property_name,
+      tag_property_name, source_property_name, review_checkbox_property_name, last_edited_property_name,
+      filter_property_name, filter_operator, filter_value, last_synced_at, created_at, updated_at
+    ) VALUES (
+      'system-deleted', '삭제된 소스 보관함', 'system-deleted-target', null, 'unknown', 0,
+      'all', 'Name', null, null, null, null, null, null, null, null, null, null,
+      '2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z'
+    )
+  `
+    )
+    .run()
 
   const reviewSources = new ReviewSourceRepository(connection)
   const reviewItems = new ReviewItemRepository(connection)

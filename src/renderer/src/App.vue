@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useManualSync } from './composables/useManualSync'
 
 type ReviewItem = {
   id: number
@@ -11,6 +12,27 @@ type ReviewItem = {
 
 const appVersion = ref('0.1.0')
 const selectedId = ref(1)
+const {
+  enabledSources,
+  selectedSourceId,
+  state: syncState,
+  currentSourceName,
+  result: syncResult,
+  totals: syncTotals,
+  message: syncMessage,
+  isRunning: isSyncRunning,
+  sourceName,
+  failureMessage,
+  subscribe: subscribeSyncProgress,
+  dispose: disposeSync,
+  loadSources,
+  syncAll,
+  syncSelected,
+  cancel: cancelSync
+} = useManualSync({
+  manualSync: window.manualSync,
+  reviewSource: window.reviewSource
+})
 
 const reviewItems: ReviewItem[] = [
   {
@@ -41,8 +63,12 @@ const selectedItem = computed(
 )
 
 onMounted(async () => {
-  appVersion.value = await window.electronAPI.getAppVersion()
+  subscribeSyncProgress()
+  const [version] = await Promise.all([window.electronAPI.getAppVersion(), loadSources()])
+  appVersion.value = version
 })
+
+onUnmounted(disposeSync)
 </script>
 
 <template>
@@ -79,8 +105,67 @@ onMounted(async () => {
           <p class="eyebrow">2026년 6월 11일</p>
           <h1>오늘의 복습</h1>
         </div>
-        <button class="sync-button">Notion 동기화</button>
+        <button class="sync-button" :disabled="isSyncRunning" @click="syncAll">
+          {{ isSyncRunning ? '동기화 중' : '전체 동기화' }}
+        </button>
       </header>
+
+      <section class="sync-panel" :class="`is-${syncState}`" aria-live="polite">
+        <div class="sync-controls">
+          <div>
+            <strong>Manual Sync</strong>
+            <p>{{ syncMessage || '활성 Source 전체 또는 하나를 선택해 동기화합니다.' }}</p>
+          </div>
+          <div class="source-sync-controls">
+            <select
+              v-model="selectedSourceId"
+              aria-label="동기화 Source"
+              :disabled="isSyncRunning || enabledSources.length === 0"
+            >
+              <option v-if="enabledSources.length === 0" value="">활성 Source 없음</option>
+              <option v-for="source in enabledSources" :key="source.id" :value="source.id">
+                {{ source.name }}
+              </option>
+            </select>
+            <button
+              class="secondary-button"
+              :disabled="isSyncRunning || !selectedSourceId"
+              @click="syncSelected"
+            >
+              선택 Source 동기화
+            </button>
+            <button v-if="isSyncRunning" class="cancel-button" @click="cancelSync">
+              동기화 취소
+            </button>
+          </div>
+        </div>
+
+        <div v-if="isSyncRunning || syncResult" class="sync-status">
+          <span v-if="currentSourceName" class="current-source">
+            현재 Source: {{ currentSourceName }}
+          </span>
+          <div v-if="syncResult" class="sync-counts">
+            <span>생성 {{ syncTotals.created }}</span>
+            <span>갱신 {{ syncTotals.updated }}</span>
+            <span>변경 {{ syncTotals.changed }}</span>
+            <span>누락 {{ syncTotals.missing }}</span>
+            <span>오류 {{ syncTotals.errors }}</span>
+          </div>
+        </div>
+
+        <ul v-if="syncResult" class="source-results">
+          <li
+            v-for="sourceResult in syncResult.sources"
+            :key="sourceResult.sourceId"
+            :class="`result-${sourceResult.status}`"
+          >
+            <strong>{{ sourceName(sourceResult.sourceId) }}</strong>
+            <span v-if="sourceResult.status === 'completed'">완료</span>
+            <span v-else-if="sourceResult.status === 'cancelled'">취소됨</span>
+            <span v-else>{{ failureMessage(sourceResult.errorCode) }}</span>
+          </li>
+        </ul>
+      </section>
 
       <section class="summary-grid">
         <article>
