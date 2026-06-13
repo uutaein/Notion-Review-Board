@@ -208,6 +208,10 @@
   keeps only the external browser fallback action.
 - Added a restricted `document-viewer:resize` path. Renderer refreshes embedded viewer bounds from
   the right-panel slot on selection, ResizeObserver updates, window resize, and scroll/layout shifts.
+- Today Review now uses the selected page as the default internal viewer target and keeps only the
+  external browser fallback button visible.
+- The Today Review content grid now expands with available viewport height instead of capping the
+  queue/viewer panels around 570px, so fullscreen reduces unused lower whitespace.
 - Focused Document Viewer service, IPC, and renderer state-model verification passes 3 files and 25
   tests after the redirect-abort handling change.
 - Full regression now passes 34 files and 376 tests; typecheck and production build pass.
@@ -217,6 +221,9 @@
 - Focused Document Viewer service, IPC, preload, and renderer state-model verification passes 4 files
   and 47 tests after default internal open and resize handling.
 - Full regression now passes 34 files and 396 tests; typecheck and production build pass.
+- Focused Document Viewer verification still passes 4 files and 47 tests after the fullscreen panel
+  expansion CSS change.
+- Full regression still passes 34 files and 396 tests; typecheck and production build pass.
 
 ## Next Action
 

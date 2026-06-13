@@ -174,9 +174,16 @@ function scheduleViewerResize(): void {
   })
 }
 
+function observeDocumentViewerSlot(): void {
+  if (documentViewerSlot.value) {
+    documentViewerResizeObserver?.observe(documentViewerSlot.value)
+  }
+}
+
 async function openSelectedItemInDefaultViewer(): Promise<void> {
   await closeDocumentViewer()
   await nextTick()
+  observeDocumentViewerSlot()
   await openSelectedItemInternal()
 }
 
@@ -226,9 +233,7 @@ onMounted(async () => {
   appVersion.value = version
 
   documentViewerResizeObserver = new ResizeObserver(scheduleViewerResize)
-  if (documentViewerSlot.value) {
-    documentViewerResizeObserver.observe(documentViewerSlot.value)
-  }
+  observeDocumentViewerSlot()
   window.addEventListener('resize', scheduleViewerResize)
   window.addEventListener('scroll', scheduleViewerResize, true)
 })
@@ -236,6 +241,11 @@ onMounted(async () => {
 watch(activeView, async (view) => {
   if (view !== 'today-review') {
     await closeDocumentViewer()
+    return
+  }
+
+  if (selectedItem.value?.notionUrl) {
+    await openSelectedItemInDefaultViewer()
   }
 })
 
