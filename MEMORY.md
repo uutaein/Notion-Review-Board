@@ -197,6 +197,8 @@
 - Adjusted the internal Document Viewer open flow so Electron `ERR_ABORTED` load interruptions from
   Notion redirects/auth navigation do not surface as a failed open when the sandboxed viewer window
   can still be shown.
+- Confirmed synced real Review Items store Notion page URLs under `app.notion.com`; Document Viewer
+  URL policy now allows HTTPS `notion.com` subdomains in addition to `notion.so` and `notion.site`.
 - Focused Document Viewer service, IPC, and renderer state-model verification passes 3 files and 25
   tests after the redirect-abort handling change.
 - Full regression now passes 34 files and 376 tests; typecheck and production build pass.

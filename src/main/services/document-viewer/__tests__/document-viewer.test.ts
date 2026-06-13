@@ -7,6 +7,8 @@ import {
 
 describe('Document Viewer URL policy', () => {
   it.each([
+    'https://app.notion.com/p/Page-abc123',
+    'https://www.notion.com/workspace/Page-abc123',
     'https://www.notion.so/workspace/Page-abc123',
     'https://notion.so/workspace/Page-abc123',
     'https://workspace.notion.site/Page-abc123'
@@ -18,6 +20,7 @@ describe('Document Viewer URL policy', () => {
   it.each([
     'http://www.notion.so/workspace/Page-abc123',
     'https://example.com/page',
+    'https://notion.com.evil.test/page',
     'https://notion.so.evil.test/page',
     'file:///C:/secret.txt',
     'not a url'

@@ -11,7 +11,7 @@
 
 | ID               | SRS        | Type     | Scenario                                           | Expected result                                                                 |
 | ---------------- | ---------- | -------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
-| TC-VIEWER-001    | FR-060     | Main     | Open `https://www.notion.so/...` internally        | A sandboxed internal Electron document window loads the Notion URL              |
+| TC-VIEWER-001    | FR-060     | Main     | Open `https://app.notion.com/...` or `https://www.notion.so/...` internally | A sandboxed internal Electron document window loads the Notion URL              |
 | TC-VIEWER-002    | FR-060     | Main     | Open `https://workspace.notion.site/...` internally | A sandboxed internal Electron document window loads the Notion URL              |
 | TC-VIEWER-003    | FR-060     | Main     | Open `http://www.notion.so/...` internally         | Request is rejected with `UNSAFE_DOCUMENT_URL`                                  |
 | TC-VIEWER-004    | FR-060     | Main     | Open `https://example.com/...` internally          | Request is rejected with `UNSAFE_DOCUMENT_URL`                                  |

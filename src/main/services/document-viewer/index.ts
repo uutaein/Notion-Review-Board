@@ -19,7 +19,14 @@ export interface ElectronDocumentViewerDependencies {
   BrowserWindowClass?: BrowserWindowConstructor
 }
 
-const ALLOWED_NOTION_HOSTS = new Set(['notion.so', 'www.notion.so', 'notion.site'])
+const ALLOWED_NOTION_HOSTS = new Set([
+  'notion.com',
+  'www.notion.com',
+  'app.notion.com',
+  'notion.so',
+  'www.notion.so',
+  'notion.site'
+])
 
 export function isAllowedNotionDocumentUrl(value: string): boolean {
   try {
@@ -28,7 +35,10 @@ export function isAllowedNotionDocumentUrl(value: string): boolean {
 
     const host = parsed.hostname.toLowerCase()
     return (
-      ALLOWED_NOTION_HOSTS.has(host) || host.endsWith('.notion.so') || host.endsWith('.notion.site')
+      ALLOWED_NOTION_HOSTS.has(host) ||
+      host.endsWith('.notion.com') ||
+      host.endsWith('.notion.so') ||
+      host.endsWith('.notion.site')
     )
   } catch {
     return false
