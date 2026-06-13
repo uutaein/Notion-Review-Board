@@ -107,11 +107,25 @@
 - Mock-preload browser verification confirmed password input, token clearing after save, no token
   text in rendered UI, and connected-state display after verification.
 - Full regression now passes 19 files and 254 tests; production build passes.
+- Implemented a dedicated Notion integration tab separate from Today Review. Today Review now shows
+  review content and Manual Sync only; Notion connection and Review Source registration live under
+  `Notion 연동`.
+- Implemented the initial Review Source registration and field-mapping renderer flow: target input,
+  property discovery, collection mode conditional fields, title/URL/category/tag/origin/edited
+  selectors, all/tag/checkbox collection settings, Source save, Source listing, and enabled toggle.
+- Renderer Source settings state-model tests cover property loading, required fields, mode-specific
+  requirements, all/tag Source creation payloads, duplicate target warning, sanitized metadata
+  errors, and enabled toggling across 1 file and 8 tests.
+- Mock-preload browser verification confirmed tab separation, Source creation, Source list display,
+  Manual Sync source selector refresh, and no 1440px horizontal overflow.
+- Full regression now passes 20 files and 262 tests; production build passes.
 
 ## Next Action
 
-- Use the UI to save and verify the provided Notion API key, then register a real Notion Source.
-- Run live Electron/manual end-to-end sync verification with the user-provided Notion database.
+- Use the `Notion 연동` tab to save/verify the provided API key and register the user's real
+  Notion DB/Data Source.
+- Run live Manual Sync and fix any Notion API response-shape or mapping gaps found during the real
+  sync.
 - Consider adding component-level DOM automation if renderer test dependencies are introduced.
 
 ## Open Questions
@@ -132,6 +146,8 @@
   end-to-end verification has not been performed.
 - Notion token settings UI is implemented and mock-browser verified; actual token save/verify
   against the user's workspace still needs live Electron verification.
+- Review Source registration UI is implemented and mock-browser verified; real Notion property
+  discovery and Source save remain to be verified with the user's database.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
 

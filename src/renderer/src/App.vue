@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
+import { useReviewSourceSettings } from './composables/useReviewSourceSettings'
 
 type ReviewItem = {
   id: number
@@ -11,8 +12,11 @@ type ReviewItem = {
   dueLabel: string
 }
 
+type AppView = 'today-review' | 'notion-integration'
+
 const appVersion = ref('0.1.0')
 const selectedId = ref(1)
+const activeView = ref<AppView>('today-review')
 const {
   tokenInput,
   status: notionStatus,
@@ -47,6 +51,29 @@ const {
 } = useManualSync({
   manualSync: window.manualSync,
   reviewSource: window.reviewSource
+})
+const {
+  sources: reviewSources,
+  form: sourceForm,
+  state: sourceState,
+  message: sourceMessage,
+  titleProperties,
+  urlProperties,
+  textLikeProperties,
+  multiSelectProperties,
+  checkboxProperties,
+  filterProperties,
+  hasProperties,
+  isBusy: isSourceBusy,
+  resetModeFields,
+  loadSources: loadReviewSources,
+  loadProperties,
+  createSource,
+  setEnabled: setSourceEnabled
+} = useReviewSourceSettings({
+  reviewSource: window.reviewSource,
+  notionMetadata: window.notionMetadata,
+  onSourcesChanged: loadSources
 })
 
 const reviewItems: ReviewItem[] = [
@@ -84,6 +111,7 @@ onMounted(async () => {
   const [version] = await Promise.all([
     window.electronAPI.getAppVersion(),
     loadSources(),
+    loadReviewSources(),
     loadNotionStatus()
   ])
   appVersion.value = version
@@ -104,9 +132,20 @@ onUnmounted(disposeSync)
       </div>
 
       <nav class="nav-list">
-        <button class="nav-item active">
+        <button
+          class="nav-item"
+          :class="{ active: activeView === 'today-review' }"
+          @click="activeView = 'today-review'"
+        >
           <span>오늘의 복습</span>
           <b>3</b>
+        </button>
+        <button
+          class="nav-item"
+          :class="{ active: activeView === 'notion-integration' }"
+          @click="activeView = 'notion-integration'"
+        >
+          <span>Notion 연동</span>
         </button>
         <button class="nav-item"><span>전체 큐</span></button>
         <button class="nav-item"><span>변경된 페이지</span></button>
@@ -124,14 +163,24 @@ onUnmounted(disposeSync)
       <header class="topbar">
         <div>
           <p class="eyebrow">2026년 6월 11일</p>
-          <h1>오늘의 복습</h1>
+          <h1>{{ activeView === 'today-review' ? '오늘의 복습' : 'Notion 연동' }}</h1>
         </div>
-        <button class="sync-button" :disabled="isSyncRunning" @click="syncAll">
+        <button
+          v-if="activeView === 'today-review'"
+          class="sync-button"
+          :disabled="isSyncRunning"
+          @click="syncAll"
+        >
           {{ isSyncRunning ? '동기화 중' : '전체 동기화' }}
         </button>
       </header>
 
-      <section class="connection-panel" :class="`is-${notionStatus}`" aria-live="polite">
+      <section
+        v-if="activeView === 'notion-integration'"
+        class="connection-panel"
+        :class="`is-${notionStatus}`"
+        aria-live="polite"
+      >
         <div class="connection-copy">
           <strong>Notion 연결</strong>
           <p>{{ notionMessage }}</p>
@@ -168,7 +217,12 @@ onUnmounted(disposeSync)
         </form>
       </section>
 
-      <section class="sync-panel" :class="`is-${syncState}`" aria-live="polite">
+      <section
+        v-if="activeView === 'today-review'"
+        class="sync-panel"
+        :class="`is-${syncState}`"
+        aria-live="polite"
+      >
         <div class="sync-controls">
           <div>
             <strong>Manual Sync</strong>
@@ -225,7 +279,197 @@ onUnmounted(disposeSync)
         </ul>
       </section>
 
-      <section class="summary-grid">
+      <section
+        v-if="activeView === 'notion-integration'"
+        class="source-panel"
+        :class="`is-${sourceState}`"
+        aria-live="polite"
+      >
+        <div class="source-panel-header">
+          <div>
+            <strong>Review Source 등록</strong>
+            <p>
+              {{
+                sourceMessage ||
+                'Notion DB/Data Source URL 또는 ID를 입력하고 속성을 불러온 뒤 필드를 매핑합니다.'
+              }}
+            </p>
+          </div>
+          <button
+            class="secondary-button"
+            :disabled="isSourceBusy || !sourceForm.target.trim()"
+            @click="loadProperties"
+          >
+            {{ sourceState === 'loading' ? '속성 조회 중' : '속성 불러오기' }}
+          </button>
+        </div>
+
+        <form class="source-form" @submit.prevent="createSource">
+          <label>
+            Source 이름 *
+            <input v-model="sourceForm.name" type="text" placeholder="예: 개발 학습" />
+          </label>
+          <label class="wide-field">
+            Notion 대상 URL 또는 ID *
+            <input
+              v-model="sourceForm.target"
+              type="text"
+              placeholder="Notion Database/Data Source URL 또는 ID"
+            />
+          </label>
+          <label>
+            수집 방식 *
+            <select v-model="sourceForm.collectionMode" @change="resetModeFields">
+              <option value="all">전체 수집</option>
+              <option value="tag">태그/분류 기반</option>
+              <option value="checkbox">체크박스 기반</option>
+            </select>
+          </label>
+          <label class="checkbox-field">
+            <input v-model="sourceForm.enabled" type="checkbox" />
+            활성 Source
+          </label>
+
+          <label>
+            제목 속성 *
+            <select v-model="sourceForm.titlePropertyName" :disabled="!hasProperties">
+              <option value="">선택</option>
+              <option v-for="property in titleProperties" :key="property.id" :value="property.name">
+                {{ property.name }}
+              </option>
+            </select>
+          </label>
+          <label>
+            URL 속성
+            <select v-model="sourceForm.urlPropertyName" :disabled="!hasProperties">
+              <option value="">Notion 페이지 URL 사용</option>
+              <option v-for="property in urlProperties" :key="property.id" :value="property.name">
+                {{ property.name }}
+              </option>
+            </select>
+          </label>
+          <label>
+            분류 속성
+            <select v-model="sourceForm.categoryPropertyName" :disabled="!hasProperties">
+              <option value="">미매핑</option>
+              <option
+                v-for="property in textLikeProperties"
+                :key="property.id"
+                :value="property.name"
+              >
+                {{ property.name }} · {{ property.type }}
+              </option>
+            </select>
+          </label>
+          <label>
+            태그 속성
+            <select v-model="sourceForm.tagPropertyName" :disabled="!hasProperties">
+              <option value="">미매핑</option>
+              <option
+                v-for="property in multiSelectProperties"
+                :key="property.id"
+                :value="property.name"
+              >
+                {{ property.name }}
+              </option>
+            </select>
+          </label>
+          <label>
+            출처 속성
+            <select v-model="sourceForm.sourcePropertyName" :disabled="!hasProperties">
+              <option value="">미매핑</option>
+              <option
+                v-for="property in textLikeProperties"
+                :key="property.id"
+                :value="property.name"
+              >
+                {{ property.name }} · {{ property.type }}
+              </option>
+            </select>
+          </label>
+          <label>
+            마지막 수정 속성
+            <select v-model="sourceForm.lastEditedPropertyName" :disabled="!hasProperties">
+              <option value="">Notion last_edited_time 사용</option>
+              <option
+                v-for="property in textLikeProperties"
+                :key="property.id"
+                :value="property.name"
+              >
+                {{ property.name }} · {{ property.type }}
+              </option>
+            </select>
+          </label>
+
+          <template v-if="sourceForm.collectionMode === 'tag'">
+            <label>
+              필터 속성 *
+              <select v-model="sourceForm.filterPropertyName" :disabled="!hasProperties">
+                <option value="">선택</option>
+                <option
+                  v-for="property in filterProperties"
+                  :key="property.id"
+                  :value="property.name"
+                >
+                  {{ property.name }} · {{ property.type }}
+                </option>
+              </select>
+            </label>
+            <label>
+              필터 연산자 *
+              <select v-model="sourceForm.filterOperator">
+                <option value="equals">equals</option>
+                <option value="contains">contains</option>
+              </select>
+            </label>
+            <label>
+              필터 값 *
+              <input v-model="sourceForm.filterValue" type="text" placeholder="예: AI" />
+            </label>
+          </template>
+
+          <label v-if="sourceForm.collectionMode === 'checkbox'">
+            체크박스 속성 *
+            <select v-model="sourceForm.reviewCheckboxPropertyName" :disabled="!hasProperties">
+              <option value="">선택</option>
+              <option
+                v-for="property in checkboxProperties"
+                :key="property.id"
+                :value="property.name"
+              >
+                {{ property.name }}
+              </option>
+            </select>
+          </label>
+
+          <button class="source-submit" type="submit" :disabled="isSourceBusy">
+            {{ sourceState === 'saving' ? '저장 중' : 'Source 저장' }}
+          </button>
+        </form>
+
+        <div class="source-list">
+          <div class="section-heading">
+            <h2>등록된 Sources</h2>
+            <span>{{ reviewSources.length }}개</span>
+          </div>
+          <p v-if="reviewSources.length === 0" class="empty-source">등록된 Source가 없습니다.</p>
+          <button
+            v-for="source in reviewSources"
+            :key="source.id"
+            class="source-row"
+            type="button"
+            @click="setSourceEnabled(source.id, !source.enabled)"
+          >
+            <span>
+              <strong>{{ source.name }}</strong>
+              <small>{{ source.collectionMode }} · {{ source.titlePropertyName }}</small>
+            </span>
+            <b :class="{ disabled: !source.enabled }">{{ source.enabled ? '활성' : '비활성' }}</b>
+          </button>
+        </div>
+      </section>
+
+      <section v-if="activeView === 'today-review'" class="summary-grid">
         <article>
           <span>오늘 남은 항목</span>
           <strong>3</strong>
@@ -240,7 +484,7 @@ onUnmounted(disposeSync)
         </article>
       </section>
 
-      <section class="content-grid">
+      <section v-if="activeView === 'today-review'" class="content-grid">
         <div class="review-list">
           <div class="section-heading">
             <h2>복습 큐</h2>
