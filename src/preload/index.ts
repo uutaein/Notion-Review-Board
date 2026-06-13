@@ -53,8 +53,16 @@ const manualSync = {
   }
 }
 
+const todayReview = {
+  list: (payload?: { sort?: 'due' | 'random' }): Promise<any> =>
+    payload
+      ? ipcRenderer.invoke('review:list-today', payload)
+      : ipcRenderer.invoke('review:list-today')
+}
+
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
 contextBridge.exposeInMainWorld('notionConnection', notionConnection)
 contextBridge.exposeInMainWorld('reviewSource', reviewSource)
 contextBridge.exposeInMainWorld('notionMetadata', notionMetadata)
 contextBridge.exposeInMainWorld('manualSync', manualSync)
+contextBridge.exposeInMainWorld('todayReview', todayReview)

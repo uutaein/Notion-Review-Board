@@ -20,9 +20,11 @@ import {
 } from './services/notion/source-metadata'
 import { registerSourceMappingIpc } from './ipc/source-mapping'
 import { registerManualSyncIpc } from './ipc/manual-sync'
+import { registerTodayReviewIpc } from './ipc/today-review'
 import { createCollectionEngine } from './services/collection'
 import { createDatabaseSyncPersistence } from './services/database'
 import { ProductionNotionPageQueryClient } from './services/notion/sync-query'
+import { createTodayReviewService } from './services/review'
 import { createFsrsEngine } from './services/scheduler/fsrs-engine'
 import { createManualSyncService } from './services/synchronization'
 import type { DateTimeString, ReviewItemId, ReviewSourceId } from '../shared/domain/types'
@@ -214,6 +216,20 @@ app.whenReady().then(() => {
     service: manualSyncService,
     ipcMain,
     isValidSender
+  })
+
+  const todayReviewService = createTodayReviewService({
+    reader: {
+      findDue: (through) => database!.reviewItems.findDue(through),
+      findSourceById: (sourceId) => database!.reviewSources.findById(sourceId)
+    }
+  })
+
+  registerTodayReviewIpc({
+    service: todayReviewService,
+    ipcMain,
+    isValidSender,
+    timeZone: 'Asia/Seoul'
   })
 
   createWindow()

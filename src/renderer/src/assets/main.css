@@ -477,7 +477,12 @@ h1 {
 }
 
 .review-list {
+  display: grid;
+  height: min(570px, calc(100vh - 330px));
+  min-height: 320px;
   padding: 20px;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .section-heading {
@@ -499,6 +504,23 @@ h1 {
   font-size: 12px;
 }
 
+.review-items {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+}
+
+.review-items::-webkit-scrollbar {
+  width: 8px;
+}
+
+.review-items::-webkit-scrollbar-thumb {
+  border: 2px solid #fafbf8;
+  border-radius: 999px;
+  background: #c8cec1;
+}
+
 .review-card {
   display: flex;
   width: 100%;
@@ -517,6 +539,10 @@ h1 {
 .review-card.selected {
   border-color: #d5dccb;
   background: #eef2e8;
+}
+
+.review-card:last-child {
+  margin-bottom: 0;
 }
 
 .status-dot {

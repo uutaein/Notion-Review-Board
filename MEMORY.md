@@ -12,8 +12,11 @@
 ## Current Phase
 
 - Phase: SRS → Feature → TC
-- Active Feature: manual-sync + collection-engine
+- Active Feature: today-review renderer data binding + manual-sync
 - Active SRS IDs:
+  - SRS-FR-050
+  - SRS-FR-051
+  - SRS-FR-052
   - SRS-FR-030
   - SRS-FR-031
   - SRS-FR-032
@@ -125,13 +128,21 @@
 - Mock-preload browser verification confirmed tab separation, Source creation, Source list display,
   Manual Sync source selector refresh, and no 1440px horizontal overflow.
 - Full regression now passes 20 files and 262 tests; production build passes.
+- Replaced the hardcoded Today Review sample rows with a restricted `review:list-today` IPC,
+  preload `todayReview.list`, shared Today Review DTOs, and renderer state binding.
+- Today Review now reloads from SQLite on app mount and after manual sync completes.
+- Focused Today Review IPC, preload, and renderer state-model verification passes 3 files and 15
+  tests; full typecheck passes.
+- Full regression now passes 23 files and 277 tests; production build passes.
+- Electron dev app was restarted after the Today Review renderer data-binding change.
+- Limited the Today Review queue panel height and moved Review Item cards into an internal
+  scrollable list so long queues do not stretch the whole workspace.
+- Renderer typecheck passes after the queue scroll change.
 
 ## Next Action
 
-- Use the `Notion 연동` tab to save/verify the provided API key and register the user's real
-  Notion DB/Data Source.
-- Run live Manual Sync and fix any Notion API response-shape or mapping gaps found during the real
-  sync.
+- Use the `Notion 연동` tab to save/verify the provided API key, register the user's real Notion
+  DB/Data Source, run live Manual Sync, and confirm synced pages appear in Today Review.
 - Consider adding component-level DOM automation if renderer test dependencies are introduced.
 
 ## Open Questions
@@ -153,6 +164,12 @@
   against the user's workspace still needs live Electron verification.
 - Review Source registration UI is implemented and mock-browser verified; real Notion property
   discovery and Source save remain to be verified with the user's database.
+- Today Review renderer now reads real SQLite-backed items through IPC, but live Electron/Notion
+  display has not yet been rechecked after this change.
+- Today Review queue scroll behavior has only been typechecked; visual confirmation in the running
+  Electron window remains manual.
+- The internal Notion document viewer remains a placeholder; selected items currently support
+  external browser opening only.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
 - Current code uses `orphaned` status and `system-deleted` Source contrary to accepted ADR-015.

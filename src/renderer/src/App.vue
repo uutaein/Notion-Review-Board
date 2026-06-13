@@ -3,20 +3,20 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
 import { useReviewSourceSettings } from './composables/useReviewSourceSettings'
-
-type ReviewItem = {
-  id: number
-  title: string
-  source: string
-  category: string
-  dueLabel: string
-}
+import { useTodayReview } from './composables/useTodayReview'
 
 type AppView = 'today-review' | 'notion-integration'
 
 const appVersion = ref('0.1.0')
-const selectedId = ref(1)
 const activeView = ref<AppView>('today-review')
+const {
+  items: reviewItems,
+  selectedId,
+  selectedItem,
+  message: todayReviewMessage,
+  dueLabel,
+  load: loadTodayReview
+} = useTodayReview(window.todayReview)
 const {
   tokenInput,
   status: notionStatus,
@@ -45,8 +45,8 @@ const {
   subscribe: subscribeSyncProgress,
   dispose: disposeSync,
   loadSources,
-  syncAll,
-  syncSelected,
+  syncAll: runSyncAll,
+  syncSelected: runSyncSelected,
   cancel: cancelSync
 } = useManualSync({
   manualSync: window.manualSync,
@@ -76,33 +76,23 @@ const {
   onSourcesChanged: loadSources
 })
 
-const reviewItems: ReviewItem[] = [
-  {
-    id: 1,
-    title: 'Electron 프로세스 모델 정리',
-    source: '개발 학습',
-    category: 'Electron',
-    dueLabel: '오늘'
-  },
-  {
-    id: 2,
-    title: '네트워크 계층별 핵심 개념',
-    source: '시험 준비',
-    category: '네트워크',
-    dueLabel: '오늘'
-  },
-  {
-    id: 3,
-    title: 'FSRS 스케줄링 방식',
-    source: 'AI 학습',
-    category: '미분류',
-    dueLabel: '1일 지남'
-  }
-]
+const remainingReviewCount = computed(() => reviewItems.value.length)
 
-const selectedItem = computed(
-  () => reviewItems.find((item) => item.id === selectedId.value) ?? reviewItems[0]
-)
+async function syncAll(): Promise<void> {
+  await runSyncAll()
+  await loadTodayReview()
+}
+
+async function syncSelected(): Promise<void> {
+  await runSyncSelected()
+  await loadTodayReview()
+}
+
+async function openSelectedItem(): Promise<void> {
+  if (selectedItem.value?.notionUrl) {
+    await window.electronAPI.openExternal(selectedItem.value.notionUrl)
+  }
+}
 
 const confirmDeleteNotionToken = (): boolean => window.confirm('저장된 Notion 토큰을 삭제할까요?')
 
@@ -112,6 +102,7 @@ onMounted(async () => {
     window.electronAPI.getAppVersion(),
     loadSources(),
     loadReviewSources(),
+    loadTodayReview(),
     loadNotionStatus()
   ])
   appVersion.value = version
@@ -138,7 +129,7 @@ onUnmounted(disposeSync)
           @click="activeView = 'today-review'"
         >
           <span>오늘의 복습</span>
-          <b>3</b>
+          <b>{{ remainingReviewCount }}</b>
         </button>
         <button
           class="nav-item"
@@ -472,7 +463,7 @@ onUnmounted(disposeSync)
       <section v-if="activeView === 'today-review'" class="summary-grid">
         <article>
           <span>오늘 남은 항목</span>
-          <strong>3</strong>
+          <strong>{{ remainingReviewCount }}</strong>
         </article>
         <article>
           <span>이번 주 완료</span>
@@ -491,35 +482,47 @@ onUnmounted(disposeSync)
             <button>날짜순</button>
           </div>
 
-          <button
-            v-for="item in reviewItems"
-            :key="item.id"
-            class="review-card"
-            :class="{ selected: selectedId === item.id }"
-            @click="selectedId = item.id"
-          >
-            <span class="status-dot"></span>
-            <span class="review-copy">
-              <strong>{{ item.title }}</strong>
-              <small>{{ item.source }} · {{ item.category }}</small>
-            </span>
-            <span class="due-label">{{ item.dueLabel }}</span>
-          </button>
+          <div class="review-items">
+            <p v-if="reviewItems.length === 0" class="empty-source">
+              {{ todayReviewMessage || '오늘 복습할 항목이 없습니다.' }}
+            </p>
+
+            <button
+              v-for="item in reviewItems"
+              :key="item.id"
+              class="review-card"
+              :class="{ selected: selectedId === item.id }"
+              @click="selectedId = item.id"
+            >
+              <span class="status-dot"></span>
+              <span class="review-copy">
+                <strong>{{ item.title }}</strong>
+                <small>{{ item.sourceName }} · {{ item.displayCategory }}</small>
+              </span>
+              <span class="due-label">{{ dueLabel(item.dueAt) }}</span>
+            </button>
+          </div>
         </div>
 
         <div class="viewer">
-          <div class="viewer-toolbar">
+          <div v-if="selectedItem" class="viewer-toolbar">
             <div>
-              <span class="tag">{{ selectedItem.category }}</span>
+              <span class="tag">{{ selectedItem.displayCategory }}</span>
               <h2>{{ selectedItem.title }}</h2>
             </div>
-            <button>외부에서 열기</button>
+            <button @click="openSelectedItem">외부에서 열기</button>
           </div>
 
           <div class="viewer-placeholder">
             <span class="document-icon">N</span>
             <h3>Notion 문서 뷰어</h3>
-            <p>Notion 연동 후 선택한 페이지가 이 영역에 표시됩니다.</p>
+            <p>
+              {{
+                selectedItem
+                  ? '선택한 페이지는 외부 브라우저로 열 수 있습니다.'
+                  : 'Source를 동기화하면 복습할 페이지가 표시됩니다.'
+              }}
+            </p>
           </div>
 
           <div class="rating-bar">

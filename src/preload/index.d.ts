@@ -1,6 +1,7 @@
 import type { CollectionMode, FilterOperator } from '../shared/domain/source'
 import type { ManualSyncResult, SyncProgress } from '../shared/manual-sync'
 import type { NotionConnectionStatus } from '../shared/notion-connection'
+import type { TodayReviewItemDto, TodayReviewListResultDto } from '../shared/today-review'
 
 export type {
   ManualSyncResult,
@@ -155,6 +156,10 @@ export interface ManualSyncAPI {
   onProgress: (listener: (progress: SyncProgress) => void) => () => void
 }
 
+export interface TodayReviewAPI {
+  list: (payload?: { sort?: 'due' | 'random' }) => Promise<TodayReviewListResultDto>
+}
+
 declare global {
   interface Window {
     electronAPI: ElectronAPI
@@ -162,5 +167,6 @@ declare global {
     reviewSource: ReviewSourceAPI
     notionMetadata: NotionMetadataAPI
     manualSync: ManualSyncAPI
+    todayReview: TodayReviewAPI
   }
 }
