@@ -32,7 +32,7 @@ steps, so a Feature file alone is not executable verification.
 | PRD        | `docs/notion-review-board-prd-v0.1.md` | Draft                                   |
 | SRS        | `docs/notion-review-board-srs-v0.1.md` | PRD v0.1 based draft                    |
 | Features   | `feature/**/*.feature`                 | Specification; Cucumber steps undefined |
-| Test cases | `docs/test-cases/*.md`                 | Seven feature areas currently covered   |
+| Test cases | `docs/test-cases/*.md`                 | Eight feature areas currently covered   |
 | Code       | `src/**`                               | Incremental implementation              |
 
 ## Functional Traceability
@@ -52,7 +52,7 @@ steps, so a Feature file alone is not executable verification.
 | 7.11 삭제된 페이지 화면 | SRS-FR-090 ~ 092                          | `feature/missing-deleted-pages/missing-deleted-pages.feature`                                                    | `docs/test-cases/status-pages.md`; TC-STATUS-002 ~ 004; TC-STATUS-IPC-001/002; TC-STATUS-UI-002                            | `src/main/services/status-pages/index.ts`; `src/main/ipc/status-pages.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useStatusPages.ts`; missing/deleted read-only list service, IPC, preload, and renderer state-model tests pass                                                                                                           | Partially Verified |
 | 7.12 변경된 페이지 화면 | SRS-FR-080 ~ 083                          | `feature/changed-pages/changed-pages.feature`                                                                    | `docs/test-cases/status-pages.md`; TC-STATUS-001/003/004/005/006/007/008; TC-STATUS-IPC-001/002/003; TC-STATUS-UI-001/003  | `src/main/services/status-pages/index.ts`; `src/main/ipc/status-pages.ts`; `src/preload/index.ts`; `src/renderer/src/composables/useStatusPages.ts`; changed list and handling actions pass service, DB transaction, IPC, preload, and renderer state-model tests                                                                                        | Partially Verified |
 | 7.13 동기화             | SRS-FR-040 ~ 045; SRS-FR-093              | `feature/synchronization/synchronization.feature`; `feature/missing-deleted-pages/missing-deleted-pages.feature` | `docs/test-cases/manual-sync-collection-engine.md`; TC-SYNC-001 ~ 045; TC-SYNC-IPC-001 ~ 006; TC-SYNC-UI-001 ~ 010         | Manual Sync orchestration, Notion query mapping, finite Retry-After, cancellation, SQLite reconciliation, Main Process composition, privileged IPC, preload, renderer state-model tests, and mock-browser UI verification pass; live Electron/Notion E2E remains unverified                                                                              | Partially Verified |
-| 13.3 MVP 인수           | Cross-feature MVP requirements            | `feature/mvp-acceptance/mvp-acceptance.feature`                                                                  | No dedicated end-to-end TC document                                                                                        | No executable Cucumber steps or end-to-end test confirmed                                                                                                                                                                                                                                                                                                | Specified          |
+| 13.3 MVP 인수           | Cross-feature MVP requirements            | `feature/mvp-acceptance/mvp-acceptance.feature`                                                                  | `docs/test-cases/mvp-acceptance.md`; TC-MVP-001 ~ 011                                                                      | MVP acceptance release gate is defined; supporting automated suites pass for collection, sync, Today Review, viewer, rating, status pages, IPC/preload, typecheck, tests, and build; final live Electron MVP pass remains to be recorded                                                                                                                 | Partially Verified |
 
 ## Supporting Traceability
 
@@ -80,7 +80,7 @@ steps, so a Feature file alone is not executable verification.
 | Missing/deleted actions remain policy-blocked            | Close SRS-OPEN-003 before implementing confirmation/recovery/removal actions          |
 | Renderer UI cases are documented but not automated       | Implement UI, then map UI test files to the existing `*-UI-*` cases                   |
 | Cucumber Features are not executable                     | Add step definitions only when executable BDD is intentionally adopted                |
-| MVP acceptance Feature has no end-to-end evidence        | Add an explicit MVP acceptance test strategy and executable cases                     |
+| MVP acceptance live pass remains unrecorded              | Execute `docs/test-cases/mvp-acceptance.md` live manual cases and record result       |
 | ADR-015 Source deletion policy differs from current code | Remove `orphaned`/`system-deleted`; add nullable Source and log snapshot migration TC |
 
 ## Verification Baseline
@@ -156,6 +156,9 @@ Verified on 2026-06-12:
   Notion-URL-only internal/external open path. Automated tests cover URL policy, sandboxed window
   options, IPC validation, preload exposure, and renderer state messages. Live Notion content
   rendering remains unverified.
+- MVP acceptance now has a dedicated release-gate TC document in
+  `docs/test-cases/mvp-acceptance.md`. Supporting automated checks are passing, but final live
+  Electron MVP pass is not yet recorded.
 
 ## Maintenance Rule
 

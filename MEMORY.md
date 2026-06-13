@@ -12,7 +12,7 @@
 ## Current Phase
 
 - Phase: SRS → Feature → TC
-- Active Feature: document viewer
+- Active Feature: MVP acceptance
 - Active SRS IDs:
   - SRS-FR-050
   - SRS-FR-051
@@ -224,14 +224,19 @@
 - Focused Document Viewer verification still passes 4 files and 47 tests after the fullscreen panel
   expansion CSS change.
 - Full regression still passes 34 files and 396 tests; typecheck and production build pass.
+- Added `docs/test-cases/mvp-acceptance.md` as the MVP release gate for SRS section 13.3 and section 17. It maps Notion connection, Source registration, collection, sync, Today Review, embedded
+  viewer, review rating, status pages, security boundaries, and regression checks to TC-MVP-001 ~ 011.
+- MVP acceptance is now `Partially Verified`: supporting automated suites pass, but the final live
+  Electron manual pass still needs to be executed and recorded.
+- Focused Prettier check passed for the MVP acceptance TC, traceability, and memory documents.
+- Cucumber dry-run completed after the MVP acceptance TC update; Feature scenarios remain undefined
+  because step definitions do not exist.
 
 ## Next Action
 
-- Re-test the live Electron embedded document view against a real allowed Notion page, including
-  resizing the window and changing right-panel size.
-- Verify the live Electron UI for `변경된 페이지` and `삭제된 페이지` against real changed/missing data.
-- Consider component-level DOM automation for the viewer layout if renderer test dependencies are
-  introduced.
+- Execute `docs/test-cases/mvp-acceptance.md` live manual cases TC-MVP-001, 002, 004, 005, 006, 007,
+  008, and 009 in the Electron app and record the result in `MEMORY.md`.
+- Keep TC-MVP-003, 010, and 011 green on the final candidate commit.
 
 ## Open Questions
 
@@ -275,6 +280,8 @@
 - Current code uses `orphaned` status and `system-deleted` Source contrary to accepted ADR-015.
 - ADR-015 requires a migration before the Source deletion backend can be considered verified.
 - No standalone TEST_MATRIX exists; `docs/test-cases/*.md` currently serves as the test matrix.
+- MVP should not be marked complete until the live manual acceptance pass is recorded, even though
+  supporting automated verification is green.
 
 ## Regression Scope
 
