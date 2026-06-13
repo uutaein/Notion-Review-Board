@@ -10,11 +10,24 @@ export interface SourcePropertyOption {
 export interface ReviewSourceSummary {
   id: string
   name: string
+  notionTargetId: string
+  notionTargetUrl: string | null
   enabled: boolean
   collectionMode: string
   titlePropertyName: string
+  urlPropertyName: string | null
+  categoryPropertyName: string | null
+  tagPropertyName: string | null
+  sourcePropertyName: string | null
+  reviewCheckboxPropertyName: string | null
+  lastEditedPropertyName: string | null
+  filterPropertyName: string | null
+  filterOperator: string | null
+  filterValue: string | null
   lastSyncedAt: string | null
 }
+
+export type SourceDeletePolicy = 'archive' | 'delete' | 'keep-history'
 
 export interface ReviewSourceSettingsApi {
   listSources: () => Promise<ReviewSourceSummary[]>
@@ -34,6 +47,26 @@ export interface ReviewSourceSettingsApi {
     filterOperator?: FilterOperator | null
     filterValue?: string | null
   }) => Promise<ReviewSourceSummary>
+  updateSource: (payload: {
+    id: string
+    name: string
+    enabled: boolean
+    collectionMode: CollectionMode
+    titlePropertyName: string
+    urlPropertyName?: string | null
+    categoryPropertyName?: string | null
+    tagPropertyName?: string | null
+    sourcePropertyName?: string | null
+    reviewCheckboxPropertyName?: string | null
+    lastEditedPropertyName?: string | null
+    filterPropertyName?: string | null
+    filterOperator?: FilterOperator | null
+    filterValue?: string | null
+  }) => Promise<ReviewSourceSummary>
+  deleteSource: (payload: {
+    sourceId: string
+    itemPolicy: SourceDeletePolicy
+  }) => Promise<{ success: boolean }>
   setEnabled: (payload: { sourceId: string; enabled: boolean }) => Promise<ReviewSourceSummary>
 }
 
@@ -70,6 +103,8 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
   const properties = ref<SourcePropertyOption[]>([])
   const state = ref<SourceSettingsState>('idle')
   const message = ref('')
+  const editingSourceId = ref<string | null>(null)
+  const deletePolicy = ref<SourceDeletePolicy>('archive')
   const form = ref({
     name: '',
     target: '',
@@ -111,9 +146,18 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
   )
   const hasProperties = computed(() => properties.value.length > 0)
   const isBusy = computed(() => state.value === 'loading' || state.value === 'saving')
+  const isEditing = computed(() => editingSourceId.value !== null)
 
   function optional(value: string): string | null {
     return value.trim() === '' ? null : value
+  }
+
+  function collectionMode(value: string): CollectionMode {
+    return value === 'tag' || value === 'checkbox' || value === 'all' ? value : 'all'
+  }
+
+  function filterOperator(value: string | null): FilterOperator {
+    return value === 'contains' || value === 'checked' || value === 'equals' ? value : 'equals'
   }
 
   function publicError(error: unknown): string {
@@ -123,7 +167,9 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
 
   function validateForm(): string | null {
     if (form.value.name.trim() === '') return 'Source 이름을 입력하세요.'
-    if (form.value.target.trim() === '') return 'Notion 대상 URL 또는 ID를 입력하세요.'
+    if (!isEditing.value && form.value.target.trim() === '') {
+      return 'Notion 대상 URL 또는 ID를 입력하세요.'
+    }
     if (form.value.titlePropertyName.trim() === '') return '제목 속성을 선택하세요.'
     if (form.value.collectionMode === 'tag') {
       if (form.value.filterPropertyName.trim() === '' || form.value.filterValue.trim() === '') {
@@ -157,6 +203,51 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
 
   async function loadSources(): Promise<void> {
     sources.value = await dependencies.reviewSource.listSources()
+  }
+
+  function resetForm(): void {
+    editingSourceId.value = null
+    properties.value = []
+    deletePolicy.value = 'archive'
+    form.value = {
+      name: '',
+      target: '',
+      enabled: true,
+      collectionMode: 'all',
+      titlePropertyName: '',
+      urlPropertyName: '',
+      categoryPropertyName: '',
+      tagPropertyName: '',
+      sourcePropertyName: '',
+      reviewCheckboxPropertyName: '',
+      lastEditedPropertyName: '',
+      filterPropertyName: '',
+      filterOperator: 'equals',
+      filterValue: ''
+    }
+    message.value = ''
+  }
+
+  async function editSource(source: ReviewSourceSummary): Promise<void> {
+    editingSourceId.value = source.id
+    deletePolicy.value = 'archive'
+    form.value = {
+      name: source.name,
+      target: source.notionTargetUrl ?? source.notionTargetId,
+      enabled: source.enabled,
+      collectionMode: collectionMode(source.collectionMode),
+      titlePropertyName: source.titlePropertyName,
+      urlPropertyName: source.urlPropertyName ?? '',
+      categoryPropertyName: source.categoryPropertyName ?? '',
+      tagPropertyName: source.tagPropertyName ?? '',
+      sourcePropertyName: source.sourcePropertyName ?? '',
+      reviewCheckboxPropertyName: source.reviewCheckboxPropertyName ?? '',
+      lastEditedPropertyName: source.lastEditedPropertyName ?? '',
+      filterPropertyName: source.filterPropertyName ?? '',
+      filterOperator: filterOperator(source.filterOperator),
+      filterValue: source.filterValue ?? ''
+    }
+    await loadProperties()
   }
 
   async function loadProperties(): Promise<void> {
@@ -222,6 +313,82 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
     }
   }
 
+  function sourcePayload() {
+    return {
+      name: form.value.name,
+      enabled: form.value.enabled,
+      collectionMode: form.value.collectionMode,
+      titlePropertyName: form.value.titlePropertyName,
+      urlPropertyName: optional(form.value.urlPropertyName),
+      categoryPropertyName: optional(form.value.categoryPropertyName),
+      tagPropertyName: optional(form.value.tagPropertyName),
+      sourcePropertyName: optional(form.value.sourcePropertyName),
+      reviewCheckboxPropertyName: optional(form.value.reviewCheckboxPropertyName),
+      lastEditedPropertyName: optional(form.value.lastEditedPropertyName),
+      filterPropertyName: optional(form.value.filterPropertyName),
+      filterOperator:
+        form.value.collectionMode === 'checkbox'
+          ? 'checked'
+          : form.value.collectionMode === 'tag'
+            ? form.value.filterOperator
+            : null,
+      filterValue: form.value.collectionMode === 'tag' ? optional(form.value.filterValue) : null
+    }
+  }
+
+  async function saveSource(): Promise<void> {
+    resetModeFields()
+    const validation = validateForm()
+    if (validation) {
+      message.value = validation
+      return
+    }
+
+    state.value = 'saving'
+    try {
+      if (editingSourceId.value) {
+        await dependencies.reviewSource.updateSource({
+          id: editingSourceId.value,
+          ...sourcePayload()
+        })
+        message.value = 'Review Source가 수정되었습니다.'
+      } else {
+        await dependencies.reviewSource.createSource({
+          target: form.value.target,
+          ...sourcePayload()
+        })
+        message.value = 'Review Source가 저장되었습니다.'
+      }
+      await loadSources()
+      await dependencies.onSourcesChanged?.()
+    } catch (error) {
+      message.value = publicError(error)
+    } finally {
+      state.value = 'idle'
+    }
+  }
+
+  async function deleteSelectedSource(confirmDelete: () => boolean): Promise<void> {
+    if (!editingSourceId.value) return
+    if (!confirmDelete()) return
+
+    state.value = 'saving'
+    try {
+      await dependencies.reviewSource.deleteSource({
+        sourceId: editingSourceId.value,
+        itemPolicy: deletePolicy.value
+      })
+      resetForm()
+      await loadSources()
+      await dependencies.onSourcesChanged?.()
+      message.value = 'Review Source가 삭제되었습니다.'
+    } catch (error) {
+      message.value = publicError(error)
+    } finally {
+      state.value = 'idle'
+    }
+  }
+
   async function setEnabled(sourceId: string, enabled: boolean): Promise<void> {
     try {
       await dependencies.reviewSource.setEnabled({ sourceId, enabled })
@@ -235,6 +402,8 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
   return {
     sources,
     properties,
+    editingSourceId,
+    deletePolicy,
     form,
     state,
     message,
@@ -246,10 +415,15 @@ export function useReviewSourceSettings(dependencies: ReviewSourceSettingsDepend
     filterProperties,
     hasProperties,
     isBusy,
+    isEditing,
     resetModeFields,
+    resetForm,
     loadSources,
     loadProperties,
+    editSource,
     createSource,
+    saveSource,
+    deleteSelectedSource,
     setEnabled
   }
 }

@@ -6,13 +6,46 @@ const sourceApi = (): ReviewSourceSettingsApi => ({
   createSource: vi.fn().mockResolvedValue({
     id: 'source-1',
     name: 'Study',
+    notionTargetId: 'target',
+    notionTargetUrl: null,
     enabled: true,
     collectionMode: 'all',
     titlePropertyName: 'Name',
+    urlPropertyName: null,
+    categoryPropertyName: null,
+    tagPropertyName: null,
+    sourcePropertyName: null,
+    reviewCheckboxPropertyName: null,
+    lastEditedPropertyName: null,
+    filterPropertyName: null,
+    filterOperator: null,
+    filterValue: null,
     lastSyncedAt: null
   }),
+  updateSource: vi.fn(),
+  deleteSource: vi.fn(),
   setEnabled: vi.fn()
 })
+
+const existingSource = {
+  id: 'source-1',
+  name: 'Study',
+  notionTargetId: 'target',
+  notionTargetUrl: null,
+  enabled: true,
+  collectionMode: 'tag' as const,
+  titlePropertyName: 'Name',
+  urlPropertyName: null,
+  categoryPropertyName: 'Category',
+  tagPropertyName: 'Tags',
+  sourcePropertyName: null,
+  reviewCheckboxPropertyName: null,
+  lastEditedPropertyName: null,
+  filterPropertyName: 'Category',
+  filterOperator: 'contains' as const,
+  filterValue: 'AI',
+  lastSyncedAt: null
+}
 
 const properties = [
   { id: 'title', name: 'Name', type: 'title' },
@@ -164,5 +197,76 @@ describe('Review Source settings renderer model', () => {
       enabled: false
     })
     expect(onSourcesChanged).toHaveBeenCalledOnce()
+  })
+
+  it('TC-SOURCE-UI-004/005: loads a Source into edit mode and cancels without persistence', async () => {
+    const { model, notionMetadata, reviewSource } = setup()
+
+    await model.editSource(existingSource)
+    expect(notionMetadata.listProperties).toHaveBeenCalledWith({ target: 'target' })
+    expect(model.isEditing.value).toBe(true)
+    expect(model.form.value).toMatchObject({
+      name: 'Study',
+      target: 'target',
+      collectionMode: 'tag',
+      titlePropertyName: 'Name',
+      filterPropertyName: 'Category',
+      filterOperator: 'contains',
+      filterValue: 'AI'
+    })
+
+    model.resetForm()
+    expect(model.isEditing.value).toBe(false)
+    expect(reviewSource.updateSource).not.toHaveBeenCalled()
+  })
+
+  it('TC-SOURCE-UI-004: updates the selected Source with editable settings only', async () => {
+    const { model, reviewSource, onSourcesChanged } = setup()
+    await model.editSource(existingSource)
+    model.form.value.name = 'Updated'
+    model.form.value.filterValue = 'Cheetos'
+
+    await model.saveSource()
+
+    expect(reviewSource.updateSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'source-1',
+        name: 'Updated',
+        collectionMode: 'tag',
+        titlePropertyName: 'Name',
+        filterPropertyName: 'Category',
+        filterOperator: 'contains',
+        filterValue: 'Cheetos'
+      })
+    )
+    expect(reviewSource.createSource).not.toHaveBeenCalled()
+    expect(model.message.value).toBe('Review Source가 수정되었습니다.')
+    expect(onSourcesChanged).toHaveBeenCalled()
+  })
+
+  it('TC-SOURCE-UI-006/007: deletes the selected Source only after confirmation and policy choice', async () => {
+    const { model, reviewSource, onSourcesChanged } = setup()
+    await model.editSource(existingSource)
+    model.deletePolicy.value = 'keep-history'
+
+    await model.deleteSelectedSource(() => true)
+
+    expect(reviewSource.deleteSource).toHaveBeenCalledWith({
+      sourceId: 'source-1',
+      itemPolicy: 'keep-history'
+    })
+    expect(model.isEditing.value).toBe(false)
+    expect(model.message.value).toBe('Review Source가 삭제되었습니다.')
+    expect(onSourcesChanged).toHaveBeenCalled()
+  })
+
+  it('does not delete a selected Source when confirmation is rejected', async () => {
+    const { model, reviewSource } = setup()
+    await model.editSource(existingSource)
+
+    await model.deleteSelectedSource(() => false)
+
+    expect(reviewSource.deleteSource).not.toHaveBeenCalled()
+    expect(model.isEditing.value).toBe(true)
   })
 })

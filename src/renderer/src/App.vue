@@ -54,6 +54,8 @@ const {
 })
 const {
   sources: reviewSources,
+  editingSourceId,
+  deletePolicy,
   form: sourceForm,
   state: sourceState,
   message: sourceMessage,
@@ -65,10 +67,14 @@ const {
   filterProperties,
   hasProperties,
   isBusy: isSourceBusy,
+  isEditing: isEditingSource,
   resetModeFields,
+  resetForm: resetSourceForm,
   loadSources: loadReviewSources,
   loadProperties,
-  createSource,
+  editSource,
+  saveSource,
+  deleteSelectedSource,
   setEnabled: setSourceEnabled
 } = useReviewSourceSettings({
   reviewSource: window.reviewSource,
@@ -95,6 +101,8 @@ async function openSelectedItem(): Promise<void> {
 }
 
 const confirmDeleteNotionToken = (): boolean => window.confirm('저장된 Notion 토큰을 삭제할까요?')
+const confirmDeleteSource = (): boolean =>
+  window.confirm('선택한 Review Source를 삭제할까요? 선택한 정책에 따라 기존 항목이 처리됩니다.')
 
 onMounted(async () => {
   subscribeSyncProgress()
@@ -278,7 +286,7 @@ onUnmounted(disposeSync)
       >
         <div class="source-panel-header">
           <div>
-            <strong>Review Source 등록</strong>
+            <strong>{{ isEditingSource ? 'Review Source 수정' : 'Review Source 등록' }}</strong>
             <p>
               {{
                 sourceMessage ||
@@ -295,7 +303,7 @@ onUnmounted(disposeSync)
           </button>
         </div>
 
-        <form class="source-form" @submit.prevent="createSource">
+        <form class="source-form" @submit.prevent="saveSource">
           <label>
             Source 이름 *
             <input v-model="sourceForm.name" type="text" placeholder="예: 개발 학습" />
@@ -306,6 +314,7 @@ onUnmounted(disposeSync)
               v-model="sourceForm.target"
               type="text"
               placeholder="Notion Database/Data Source URL 또는 ID"
+              :disabled="isEditingSource"
             />
           </label>
           <label>
@@ -434,9 +443,39 @@ onUnmounted(disposeSync)
           </label>
 
           <button class="source-submit" type="submit" :disabled="isSourceBusy">
-            {{ sourceState === 'saving' ? '저장 중' : 'Source 저장' }}
+            {{
+              sourceState === 'saving' ? '저장 중' : isEditingSource ? 'Source 수정' : 'Source 저장'
+            }}
+          </button>
+          <button
+            v-if="isEditingSource"
+            class="source-secondary"
+            type="button"
+            :disabled="isSourceBusy"
+            @click="resetSourceForm"
+          >
+            취소
           </button>
         </form>
+
+        <div v-if="isEditingSource" class="source-delete-controls">
+          <label>
+            삭제 정책
+            <select v-model="deletePolicy" :disabled="isSourceBusy">
+              <option value="archive">항목 보관</option>
+              <option value="delete">삭제 tombstone 유지</option>
+              <option value="keep-history">항목 제거, 로그 보존</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            class="danger-button"
+            :disabled="isSourceBusy || !editingSourceId"
+            @click="deleteSelectedSource(confirmDeleteSource)"
+          >
+            Source 삭제
+          </button>
+        </div>
 
         <div class="source-list">
           <div class="section-heading">
@@ -444,19 +483,26 @@ onUnmounted(disposeSync)
             <span>{{ reviewSources.length }}개</span>
           </div>
           <p v-if="reviewSources.length === 0" class="empty-source">등록된 Source가 없습니다.</p>
-          <button
+          <div
             v-for="source in reviewSources"
             :key="source.id"
             class="source-row"
-            type="button"
-            @click="setSourceEnabled(source.id, !source.enabled)"
+            :class="{ selected: editingSourceId === source.id }"
           >
             <span>
               <strong>{{ source.name }}</strong>
               <small>{{ source.collectionMode }} · {{ source.titlePropertyName }}</small>
             </span>
-            <b :class="{ disabled: !source.enabled }">{{ source.enabled ? '활성' : '비활성' }}</b>
-          </button>
+            <div class="source-row-actions">
+              <button type="button" class="secondary-button" @click="editSource(source)">
+                수정
+              </button>
+              <button type="button" @click="setSourceEnabled(source.id, !source.enabled)">
+                {{ source.enabled ? '비활성' : '활성' }}
+              </button>
+              <b :class="{ disabled: !source.enabled }">{{ source.enabled ? '활성' : '비활성' }}</b>
+            </div>
+          </div>
         </div>
       </section>
 

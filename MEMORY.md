@@ -138,6 +138,11 @@
 - Limited the Today Review queue panel height and moved Review Item cards into an internal
   scrollable list so long queues do not stretch the whole workspace.
 - Renderer typecheck passes after the queue scroll change.
+- Added Review Source edit and delete controls to the Notion integration tab using the existing
+  `source:update` and `source:delete` preload/IPC contract.
+- Source delete requires an explicit policy selection before confirmation.
+- Focused Source settings renderer verification passes 1 file and 12 tests; renderer typecheck
+  passes.
 
 ## Next Action
 
@@ -168,6 +173,8 @@
   display has not yet been rechecked after this change.
 - Today Review queue scroll behavior has only been typechecked; visual confirmation in the running
   Electron window remains manual.
+- Review Source edit/delete UI has focused state-model coverage but still needs live Electron
+  confirmation against existing real Sources.
 - The internal Notion document viewer remains a placeholder; selected items currently support
   external browser opening only.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
