@@ -41,7 +41,20 @@ const notionMetadata = {
     ipcRenderer.invoke('notion:preview-mapping', payload)
 }
 
+const manualSync = {
+  syncAll: (): Promise<any> => ipcRenderer.invoke('sync:all'),
+  syncSource: (payload: { sourceId: string }): Promise<any> =>
+    ipcRenderer.invoke('sync:source', payload),
+  cancel: (): Promise<{ cancelled: true }> => ipcRenderer.invoke('sync:cancel'),
+  onProgress: (listener: (progress: any) => void): (() => void) => {
+    const handler = (_event: unknown, progress: any): void => listener(progress)
+    ipcRenderer.on('sync:progress', handler)
+    return () => ipcRenderer.removeListener('sync:progress', handler)
+  }
+}
+
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
 contextBridge.exposeInMainWorld('notionConnection', notionConnection)
 contextBridge.exposeInMainWorld('reviewSource', reviewSource)
 contextBridge.exposeInMainWorld('notionMetadata', notionMetadata)
+contextBridge.exposeInMainWorld('manualSync', manualSync)

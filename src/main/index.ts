@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
@@ -18,6 +19,13 @@ import {
   ProductionNotionMetadataClient
 } from './services/notion/source-metadata'
 import { registerSourceMappingIpc } from './ipc/source-mapping'
+import { registerManualSyncIpc } from './ipc/manual-sync'
+import { createCollectionEngine } from './services/collection'
+import { createDatabaseSyncPersistence } from './services/database'
+import { ProductionNotionPageQueryClient } from './services/notion/sync-query'
+import { createFsrsEngine } from './services/scheduler/fsrs-engine'
+import { createManualSyncService } from './services/synchronization'
+import type { DateTimeString, ReviewItemId, ReviewSourceId } from '../shared/domain/types'
 
 let database: DatabaseService | null = null
 
@@ -156,6 +164,54 @@ app.whenReady().then(() => {
   registerSourceMappingIpc({
     sourceService,
     metadataService,
+    ipcMain,
+    isValidSender
+  })
+
+  const fsrsEngine = createFsrsEngine()
+  const manualSyncService = createManualSyncService({
+    sources: {
+      listEnabledSources: () =>
+        database!.reviewSources.findAll().filter((source) => source.enabled),
+      findSourceById: (sourceId: ReviewSourceId) => database!.reviewSources.findById(sourceId)
+    },
+    notion: new ProductionNotionPageQueryClient({ vault }),
+    collection: createCollectionEngine(),
+    persistence: createDatabaseSyncPersistence(database!),
+    scheduler: {
+      createInitialState: (now) => ({
+        dueAt: now,
+        state: fsrsEngine.createInitialState(now)
+      })
+    },
+    retry: {
+      maxRetries: 2,
+      maxTotalWaitMs: 30_000,
+      fallbackDelayMs: 1_000,
+      sleep: (delayMs, signal) =>
+        new Promise<void>((resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new Error('SYNC_CANCELLED'))
+            return
+          }
+
+          const timer = setTimeout(resolve, delayMs)
+          signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer)
+              reject(new Error('SYNC_CANCELLED'))
+            },
+            { once: true }
+          )
+        })
+    },
+    now: () => new Date().toISOString() as DateTimeString,
+    createReviewItemId: () => `item_${randomUUID()}` as ReviewItemId
+  })
+
+  registerManualSyncIpc({
+    service: manualSyncService,
     ipcMain,
     isValidSender
   })

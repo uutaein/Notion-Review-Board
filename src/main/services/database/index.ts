@@ -8,6 +8,7 @@ import {
   ReviewSourceRepository,
   SyncEventRepository
 } from './repositories'
+export { createDatabaseSyncPersistence } from './sync-persistence'
 
 export interface DatabaseService {
   connection: Database.Database

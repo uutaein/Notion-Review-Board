@@ -1,4 +1,12 @@
-import type { ReviewSource, CollectionMode, FilterOperator } from '../shared/domain/source'
+import type { CollectionMode, FilterOperator } from '../shared/domain/source'
+import type { ManualSyncResult, SyncProgress } from '../shared/manual-sync'
+
+export type {
+  ManualSyncResult,
+  SourceSyncCounts,
+  SyncFailureCode,
+  SyncProgress
+} from '../shared/manual-sync'
 
 export interface ElectronAPI {
   getAppVersion: () => Promise<string>
@@ -139,11 +147,19 @@ export interface NotionMetadataAPI {
   previewMapping: (payload: PreviewMappingInput) => Promise<PreviewMappingResult>
 }
 
+export interface ManualSyncAPI {
+  syncAll: () => Promise<ManualSyncResult>
+  syncSource: (payload: { sourceId: string }) => Promise<ManualSyncResult>
+  cancel: () => Promise<{ cancelled: true }>
+  onProgress: (listener: (progress: SyncProgress) => void) => () => void
+}
+
 declare global {
   interface Window {
     electronAPI: ElectronAPI
     notionConnection: NotionConnectionAPI
     reviewSource: ReviewSourceAPI
     notionMetadata: NotionMetadataAPI
+    manualSync: ManualSyncAPI
   }
 }

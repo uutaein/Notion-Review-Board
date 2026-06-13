@@ -150,6 +150,126 @@ h1 {
   cursor: pointer;
 }
 
+.sync-button:disabled,
+.source-sync-controls button:disabled,
+.source-sync-controls select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sync-panel {
+  margin-top: 22px;
+  padding: 16px 18px;
+  border: 1px solid #dfe1d9;
+  border-radius: 12px;
+  background: #fafbf8;
+}
+
+.sync-panel.is-error {
+  border-color: #d9aaa3;
+  background: #fff8f6;
+}
+
+.sync-panel.is-cancelled {
+  border-color: #d9c99d;
+  background: #fffcf3;
+}
+
+.sync-controls,
+.sync-status,
+.source-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.sync-controls p {
+  margin: 4px 0 0;
+  color: #73786e;
+  font-size: 12px;
+}
+
+.source-sync-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.source-sync-controls select,
+.source-sync-controls button {
+  min-height: 36px;
+  border: 1px solid #d5d9d0;
+  border-radius: 8px;
+  background: white;
+  font-size: 12px;
+}
+
+.source-sync-controls select {
+  min-width: 160px;
+  padding: 0 10px;
+}
+
+.source-sync-controls button {
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.source-sync-controls .cancel-button {
+  color: #9b4e45;
+  border-color: #d9aaa3;
+}
+
+.sync-status {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7e0;
+}
+
+.current-source {
+  color: #526a4c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sync-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sync-counts span {
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: #656b62;
+  background: #eef1ea;
+  font-size: 11px;
+}
+
+.source-results {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-results li {
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #f0f3ec;
+  font-size: 11px;
+}
+
+.source-results .result-failed {
+  color: #8e4139;
+  background: #fae9e6;
+}
+
+.source-results .result-cancelled {
+  color: #806628;
+  background: #f7f0da;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -365,5 +485,10 @@ h1 {
 
   .app-shell {
     grid-template-columns: 210px 1fr;
+  }
+
+  .sync-controls {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
