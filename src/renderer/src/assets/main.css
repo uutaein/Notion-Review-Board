@@ -848,6 +848,11 @@ h1 {
   color: #3d6846;
 }
 
+.rating-bar .exclude {
+  border-color: #b9beb3;
+  color: #5c5149;
+}
+
 @media (max-width: 1180px) {
   .workspace {
     padding: 28px;

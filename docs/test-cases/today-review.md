@@ -18,6 +18,7 @@ this branch.
 Implement `src/main/services/review/index.ts` with:
 
 - `createTodayReviewService({ reader, random? })`
+- `createReviewExclusionService({ persistence, createSyncEventId })`
 - `getLocalDayEndUtc(now, timeZone)`
 - `TodayReviewReader`
 - `service.list({ now, timeZone, sort?, filter? })`
@@ -49,6 +50,10 @@ Default sort is `due`. Supported filters are `unclassified`, `category`, `tag`, 
 | TC-REVIEW-014 | FR-050 | SQLite query includes the final millisecond of the local day |
 | TC-REVIEW-015 | FR-050/071 | Moving dueAt to a future day removes the item from Today Review |
 | TC-REVIEW-016 | FR-054 | Source filtering selects items whose `sourceIds` include the selected Source |
+| TC-REVIEW-017 | FR-050 | Excluding an active item archives it and records one `user_action` Sync Event |
+| TC-REVIEW-IPC-001 | FR-050 | `review:exclude` rejects untrusted senders before service access |
+| TC-REVIEW-IPC-002 | FR-050 | `review:exclude` rejects invalid or extra-field payloads |
+| TC-REVIEW-IPC-003 | FR-050 | `review:exclude` masks raw persistence errors to `INTERNAL_ERROR` |
 
 ## UI Cases To Add With The Review Components
 
@@ -65,6 +70,7 @@ Default sort is `due`. Supported filters are `unclassified`, `category`, `tag`, 
 | TC-REVIEW-UI-009 | FR-071 | Successful rating removes a newly future-due item |
 | TC-REVIEW-UI-010 | FR-071 | Pending rating disables duplicate submission |
 | TC-REVIEW-UI-011 | FR-054 | Selecting a Source from the Manual Sync controls shows only eligible items for that Source |
+| TC-REVIEW-UI-012 | FR-050 | Successful document exclusion removes the item from the current queue and disables duplicate submission while pending |
 
 ## Implementation Guardrails
 

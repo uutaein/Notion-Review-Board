@@ -8,6 +8,11 @@ import type {
 } from '../shared/document-viewer'
 import type { ManualSyncResult, SyncProgress } from '../shared/manual-sync'
 import type { NotionConnectionStatus } from '../shared/notion-connection'
+import type {
+  ExcludeReviewItemInputDto,
+  ExcludeReviewItemResultDto
+} from '../shared/review-exclusion'
+import type { ReviewQueueListResultDto } from '../shared/review-queue'
 import type { RateReviewInputDto, RateReviewResultDto, ReviewRating } from '../shared/review-rating'
 import type {
   HandleChangedPageInputDto,
@@ -174,8 +179,16 @@ export interface TodayReviewAPI {
   list: (payload?: TodayReviewListInputDto) => Promise<TodayReviewListResultDto>
 }
 
+export interface ReviewQueueAPI {
+  list: () => Promise<ReviewQueueListResultDto>
+}
+
 export interface ReviewRatingAPI {
   rate: (payload: RateReviewInputDto) => Promise<RateReviewResultDto>
+}
+
+export interface ReviewExclusionAPI {
+  exclude: (payload: ExcludeReviewItemInputDto) => Promise<ExcludeReviewItemResultDto>
 }
 
 export interface StatusPagesAPI {
@@ -200,7 +213,9 @@ declare global {
     notionMetadata: NotionMetadataAPI
     manualSync: ManualSyncAPI
     todayReview: TodayReviewAPI
+    reviewQueue: ReviewQueueAPI
     reviewRating: ReviewRatingAPI
+    reviewExclusion: ReviewExclusionAPI
     statusPages: StatusPagesAPI
     documentViewer: DocumentViewerAPI
   }

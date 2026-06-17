@@ -3,13 +3,20 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useDocumentViewer } from './composables/useDocumentViewer'
 import { useManualSync } from './composables/useManualSync'
 import { useNotionConnection } from './composables/useNotionConnection'
+import { useReviewExclusion } from './composables/useReviewExclusion'
+import { useReviewQueue } from './composables/useReviewQueue'
 import { useReviewRating } from './composables/useReviewRating'
 import { useReviewSourceSettings } from './composables/useReviewSourceSettings'
 import { useStatusPages } from './composables/useStatusPages'
 import { useTodayReview } from './composables/useTodayReview'
 import type { ReviewRating } from '../../shared/review-rating'
 
-type AppView = 'today-review' | 'notion-integration' | 'changed-pages' | 'missing-deleted-pages'
+type AppView =
+  | 'today-review'
+  | 'review-queue'
+  | 'notion-integration'
+  | 'changed-pages'
+  | 'missing-deleted-pages'
 
 const appVersion = ref('0.1.0')
 const activeView = ref<AppView>('today-review')
@@ -26,10 +33,23 @@ const {
   removeItem: removeTodayReviewItem
 } = useTodayReview(window.todayReview)
 const {
+  items: queueItems,
+  selectedId: selectedQueueItemId,
+  selectedItem: selectedQueueItem,
+  message: reviewQueueMessage,
+  dueScheduleLabel: reviewQueueDueLabel,
+  load: loadReviewQueue
+} = useReviewQueue(window.reviewQueue)
+const {
   message: reviewRatingMessage,
   isPending: isRatingPending,
   rate: rateReview
 } = useReviewRating(window.reviewRating)
+const {
+  message: reviewExclusionMessage,
+  isPending: isExclusionPending,
+  exclude: excludeReview
+} = useReviewExclusion(window.reviewExclusion)
 const {
   state: documentViewerState,
   message: documentViewerMessage,
@@ -114,18 +134,27 @@ const {
 })
 
 const remainingReviewCount = computed(() => reviewItems.value.length)
+const totalQueueCount = computed(() => queueItems.value.length)
 const activeStatusTitle = computed(() =>
   activeView.value === 'changed-pages' ? '변경된 페이지' : '삭제된 페이지'
 )
+const activePageTitle = computed(() => {
+  if (activeView.value === 'today-review') return '오늘의 복습'
+  if (activeView.value === 'review-queue') return '전체 큐'
+  if (activeView.value === 'notion-integration') return 'Notion 연동'
+  return activeStatusTitle.value
+})
 
 async function syncAll(): Promise<void> {
   await runSyncAll()
   await setSourceFilter(null)
+  await loadReviewQueue()
 }
 
 async function syncSelected(): Promise<void> {
   await runSyncSelected()
   await setSourceFilter(selectedSourceId.value || null)
+  await loadReviewQueue()
 }
 
 async function changeSelectedSyncSource(): Promise<void> {
@@ -135,6 +164,11 @@ async function changeSelectedSyncSource(): Promise<void> {
 async function openStatusView(view: 'changed-pages' | 'missing-deleted-pages'): Promise<void> {
   activeView.value = view
   await loadStatusPage(view === 'changed-pages' ? 'changed' : 'missing-deleted')
+}
+
+async function openReviewQueue(): Promise<void> {
+  activeView.value = 'review-queue'
+  await loadReviewQueue()
 }
 
 function currentDocumentViewerBounds(): {
@@ -199,6 +233,12 @@ async function openSelectedStatusItem(): Promise<void> {
   }
 }
 
+async function openSelectedQueueItemExternal(): Promise<void> {
+  if (selectedQueueItem.value?.notionUrl) {
+    await openDocumentExternal(selectedQueueItem.value.notionUrl)
+  }
+}
+
 async function handleSelectedChangedPage(action: 'pull-today' | 'keep-schedule'): Promise<void> {
   if (!selectedStatusItem.value || selectedStatusItem.value.status !== 'changed') return
   const success = await handleChangedPage(selectedStatusItem.value.id, action)
@@ -217,6 +257,16 @@ async function rateSelectedItem(rating: ReviewRating): Promise<void> {
   }
 }
 
+async function excludeSelectedItem(): Promise<void> {
+  if (!selectedItem.value) return
+  const excludedItemId = selectedItem.value.id
+  const success = await excludeReview(excludedItemId)
+  if (success) {
+    await closeDocumentViewer()
+    removeTodayReviewItem(excludedItemId)
+  }
+}
+
 const confirmDeleteNotionToken = (): boolean => window.confirm('저장된 Notion 토큰을 삭제할까요?')
 const confirmDeleteSource = (): boolean =>
   window.confirm('선택한 Review Source를 삭제할까요? 선택한 정책에 따라 기존 항목이 처리됩니다.')
@@ -228,6 +278,7 @@ onMounted(async () => {
     loadSources(),
     loadReviewSources(),
     loadTodayReview(),
+    loadReviewQueue(),
     loadNotionStatus()
   ])
   appVersion.value = version
@@ -297,7 +348,14 @@ onUnmounted(() => {
         >
           <span>Notion 연동</span>
         </button>
-        <button class="nav-item"><span>전체 큐</span></button>
+        <button
+          class="nav-item"
+          :class="{ active: activeView === 'review-queue' }"
+          @click="openReviewQueue"
+        >
+          <span>전체 큐</span>
+          <b>{{ totalQueueCount }}</b>
+        </button>
         <button
           class="nav-item"
           :class="{ active: activeView === 'changed-pages' }"
@@ -325,15 +383,7 @@ onUnmounted(() => {
       <header class="topbar">
         <div>
           <p class="eyebrow">2026년 6월 11일</p>
-          <h1>
-            {{
-              activeView === 'today-review'
-                ? '오늘의 복습'
-                : activeView === 'notion-integration'
-                  ? 'Notion 연동'
-                  : activeStatusTitle
-            }}
-          </h1>
+          <h1>{{ activePageTitle }}</h1>
         </div>
         <button
           v-if="activeView === 'today-review'"
@@ -773,36 +823,128 @@ onUnmounted(() => {
           </div>
 
           <div class="rating-bar">
-            <span>{{ reviewRatingMessage || '얼마나 잘 기억했나요?' }}</span>
+            <span>{{
+              reviewExclusionMessage || reviewRatingMessage || '얼마나 잘 기억했나요?'
+            }}</span>
             <div>
               <button
                 class="again"
-                :disabled="!selectedItem || isRatingPending"
+                :disabled="!selectedItem || isRatingPending || isExclusionPending"
                 @click="rateSelectedItem('again')"
               >
                 다시
               </button>
               <button
-                :disabled="!selectedItem || isRatingPending"
+                :disabled="!selectedItem || isRatingPending || isExclusionPending"
                 @click="rateSelectedItem('hard')"
               >
                 어려움
               </button>
               <button
                 class="good"
-                :disabled="!selectedItem || isRatingPending"
+                :disabled="!selectedItem || isRatingPending || isExclusionPending"
                 @click="rateSelectedItem('good')"
               >
                 보통
               </button>
               <button
                 class="easy"
-                :disabled="!selectedItem || isRatingPending"
+                :disabled="!selectedItem || isRatingPending || isExclusionPending"
                 @click="rateSelectedItem('easy')"
               >
                 쉬움
               </button>
+              <button
+                class="exclude"
+                :disabled="!selectedItem || isRatingPending || isExclusionPending"
+                @click="excludeSelectedItem"
+              >
+                문서 제외
+              </button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="activeView === 'review-queue'" class="content-grid status-content-grid">
+        <div class="review-list">
+          <div class="section-heading">
+            <h2>전체 active 큐</h2>
+            <button>{{ queueItems.length }}개</button>
+          </div>
+
+          <div class="review-items">
+            <p v-if="queueItems.length === 0" class="empty-source">
+              {{ reviewQueueMessage || '전체 큐에 active 항목이 없습니다.' }}
+            </p>
+
+            <button
+              v-for="item in queueItems"
+              :key="item.id"
+              class="review-card"
+              :class="{ selected: selectedQueueItemId === item.id }"
+              @click="selectedQueueItemId = item.id"
+            >
+              <span class="status-dot"></span>
+              <span class="review-copy">
+                <strong>{{ item.title }}</strong>
+                <small>{{ item.sourceName }} · {{ item.displayCategory }}</small>
+              </span>
+              <span class="due-label">{{ reviewQueueDueLabel(item.dueAt) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="viewer">
+          <div v-if="selectedQueueItem" class="viewer-toolbar">
+            <div>
+              <span class="tag">{{ selectedQueueItem.status }}</span>
+              <h2>{{ selectedQueueItem.title }}</h2>
+            </div>
+            <button
+              :disabled="documentViewerState === 'opening'"
+              @click="openSelectedQueueItemExternal"
+            >
+              외부에서 열기
+            </button>
+          </div>
+
+          <div class="status-detail">
+            <dl v-if="selectedQueueItem">
+              <div>
+                <dt>Sources</dt>
+                <dd>{{ selectedQueueItem.sourceNames.join(', ') }}</dd>
+              </div>
+              <div>
+                <dt>분류</dt>
+                <dd>{{ selectedQueueItem.displayCategory }}</dd>
+              </div>
+              <div>
+                <dt>태그</dt>
+                <dd>{{ selectedQueueItem.tags.join(', ') }}</dd>
+              </div>
+              <div>
+                <dt>출처</dt>
+                <dd>{{ selectedQueueItem.originLabel || '-' }}</dd>
+              </div>
+              <div>
+                <dt>dueAt</dt>
+                <dd>{{ selectedQueueItem.dueAt }}</dd>
+              </div>
+              <div>
+                <dt>마지막 복습</dt>
+                <dd>{{ selectedQueueItem.lastReviewedAt || '-' }}</dd>
+              </div>
+              <div>
+                <dt>마지막 동기화</dt>
+                <dd>{{ selectedQueueItem.lastSyncedAt || '-' }}</dd>
+              </div>
+              <div>
+                <dt>URL</dt>
+                <dd>{{ selectedQueueItem.notionUrl }}</dd>
+              </div>
+            </dl>
+            <p v-if="!selectedQueueItem">{{ reviewQueueMessage }}</p>
           </div>
         </div>
       </section>

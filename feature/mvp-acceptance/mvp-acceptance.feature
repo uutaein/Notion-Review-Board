@@ -16,6 +16,12 @@
     그러면 두 Source의 Review Item이 하나의 Today Review에 표시된다
     그리고 같은 Notion Page ID는 중복 표시되지 않는다
 
+  시나리오: 전체 active 큐를 확인한다
+    조건 수동 동기화로 오늘 dueAt과 미래 dueAt의 active 문서가 생성되었다
+    만일 사용자가 "전체 큐"를 연다
+    그러면 두 문서가 전체 큐에 표시된다
+    그리고 changed, missing, archived 문서는 전체 큐에 표시되지 않는다
+
   시나리오: 문서를 읽고 보통으로 평가한다
     조건 Today Review에 복습할 문서가 있다
     만일 사용자가 문서를 열고 "보통" 평가를 선택한다
@@ -39,4 +45,3 @@
     조건 사용자가 Notion 토큰을 저장하고 동기화를 실행했다
     만일 화면과 로그와 Sync Event를 확인한다
     그러면 Notion 토큰 원문은 어디에도 표시되지 않는다
-

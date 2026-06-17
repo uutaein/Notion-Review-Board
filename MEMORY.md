@@ -26,6 +26,7 @@
   - SRS-FR-043
   - SRS-FR-044
   - SRS-FR-045
+  - SRS-FR-046
   - SRS-FR-070
   - SRS-FR-071
   - SRS-FR-072
@@ -231,12 +232,73 @@
 - Focused Prettier check passed for the MVP acceptance TC, traceability, and memory documents.
 - Cucumber dry-run completed after the MVP acceptance TC update; Feature scenarios remain undefined
   because step definitions do not exist.
+- Added Today Review document exclusion: the renderer exposes a `문서 제외` button beside the rating
+  buttons, calls a restricted `review:exclude` preload/IPC path, archives only active Review Items,
+  records one `user_action` Sync Event through the existing status-action transaction, closes the
+  embedded viewer, and removes the item from the current queue.
+- Document Viewer now treats Electron `ERR_*` URL load failures after the sandboxed embedded view is
+  attached as an opened viewer state, preserving the right-panel document surface and external
+  fallback instead of surfacing `document-viewer:open` as `INTERNAL_ERROR`.
+- Added `docs/test-cases/today-review.md` coverage for Review Item exclusion and
+  `docs/test-cases/document-viewer.md` coverage for Electron load-failure tolerance.
+- Focused Review Exclusion and Document Viewer verification passes 5 files and 32 tests.
+- Full regression passes 38 files and 412 tests after rebuilding `better-sqlite3` for Node.
+- Full typecheck and production build pass after rebuilding `better-sqlite3` for Electron.
+- Focused Prettier check passes for changed code and TC documents.
+- Set the Electron renderer dev/preview server to fixed port `5317` with `strictPort: true` in
+  `electron.vite.config.ts` to avoid colliding with other local projects.
+- Refreshed the MVP automated gate after the port change: `npm test` passed 38 files and 412 tests,
+  `npm run build` passed, and `npm run test:features:dry` completed with undefined Cucumber steps
+  as expected.
+- Added SRS-FR-046 for read-only full active Review Queue visibility.
+- Added `feature/review-queue/review-queue.feature` and `docs/test-cases/review-queue.md` for
+  TC-QUEUE-001 ~ 006, TC-QUEUE-IPC-001 ~ 003, TC-QUEUE-PRELOAD-001, and TC-QUEUE-UI-001 ~ 005.
+- Implemented the `전체 큐` sidebar view with restricted `review-queue:list` IPC,
+  `reviewQueue.list` preload API, shared Review Queue DTOs, `createReviewQueueService`, and
+  renderer state binding.
+- Full Review Queue lists active Review Items regardless of whether dueAt is today or future,
+  excludes non-active statuses, sorts by dueAt, and shows selected-item Source, classification,
+  origin, dueAt, last review, last sync, and URL details without exposing FSRS state.
+- Focused Review Queue service, IPC, preload, and renderer state-model verification passes 4 files
+  and 17 tests.
+- Full regression passes 42 files and 429 tests.
+- Production build passes.
+- Cucumber dry-run completes after adding Review Queue scenarios; Feature steps remain undefined as
+  expected.
+- Focused Prettier check passes for changed code and Markdown TC/SRS/traceability documents; Feature
+  files are not Prettier-formatted because no parser is configured for `.feature`.
+- Electron dev app was started after the Review Queue implementation; renderer dev server is
+  reachable at `http://localhost:5317`.
+- Installed `@playwright/test`, added `playwright.config.ts`, ignored Playwright artifacts under
+  `test-results/` and `playwright-report/`, and added `npm run test:screen`.
+- Added `e2e/review-queue.screen.spec.ts`, which serves the built renderer from a temporary local
+  HTTP server, injects mock preload APIs, opens `전체 큐`, verifies due/future active queue rows and
+  selected-item details, checks no horizontal overflow, and writes a screenshot under
+  `test-results/playwright/review-queue-screen.png`.
+- Expanded `docs/test-cases/review-queue.md` into concrete service, IPC/preload, renderer state,
+  Playwright screen, and live Electron acceptance cases with baseline fixtures, step-by-step
+  expected results, and evidence mapping. Added TC-QUEUE-SCREEN-001 ~ 003 and TC-QUEUE-LIVE-001.
+- `npm run test:screen` passes: build/typecheck/native rebuild succeeded and 1 Playwright screen
+  test passed.
+- `npm test` still passes 42 files and 429 tests after the Playwright install.
+- Focused ESLint passes for `e2e/review-queue.screen.spec.ts` and `playwright.config.ts`.
+- Full `npm run lint` currently fails on pre-existing `no-explicit-any` errors in
+  `src/main/ipc/notion-connection.ts` and `src/main/services/source/index.ts`.
 
 ## Next Action
 
 - Execute `docs/test-cases/mvp-acceptance.md` live manual cases TC-MVP-001, 002, 004, 005, 006, 007,
-  008, and 009 in the Electron app and record the result in `MEMORY.md`.
+  008, 009, and 012 in the Electron app and record the result in `MEMORY.md`.
 - Keep TC-MVP-003, 010, and 011 green on the final candidate commit.
+- Execute TC-QUEUE-LIVE-001: live-check that the new `전체 큐` view shows active future-due Review
+  Items and excludes changed, missing, deleted, sync_error, and archived items.
+- Keep `npm run test:screen` green for renderer screen regressions; it uses mock preload data and
+  does not replace live Electron/Notion acceptance.
+- Live-check the user's failing Notion document in the embedded viewer and confirm the new
+  `문서 제외` button archives unwanted DB-imported pages from the Today Review queue.
+- Use `http://localhost:5317` as the renderer dev URL when checking the Electron dev app.
+- The remaining MVP acceptance work is live Electron/Notion manual verification; automated gate
+  TC-MVP-003, TC-MVP-010, and TC-MVP-011 is current.
 
 ## Open Questions
 
@@ -269,12 +331,19 @@
   rating against the user's synced data has not yet been manually confirmed.
 - Today Review Source filtering through the Manual Sync controls has focused automated coverage but
   still needs live Electron UI confirmation against the user's real Sources.
+- Full Review Queue display has focused service/IPC/preload/renderer coverage but still needs live
+  Electron confirmation against the user's real synced queue. Playwright screen coverage currently
+  uses mock preload data against the built renderer.
 - Missing/deleted status pages remain read-only. They intentionally do not implement deletion
   confirmation, recovery, archive, or history-preservation actions yet.
 - The internal Notion document viewer uses a sandboxed Electron `WebContentsView` embedded in the
   main window. Automated tests cover the security options, URL policy, bounds validation, cleanup,
   and Electron redirect-abort handling, but live Notion rendering has not yet been manually verified
   after the embedded-view change.
+- Document Viewer now tolerates Electron `ERR_*` load failures once the sandboxed view is attached.
+  This avoids handler-level `INTERNAL_ERROR` for Notion navigation failures, but a page that renders
+  Chromium's error content may still require the external browser fallback.
+- Document exclusion uses existing `archived` status. There is no restore/unarchive UI yet.
 - Full `npm run format:check` currently fails on 52 pre-existing files; the two changed Feature files
   were not reported.
 - Current code uses `orphaned` status and `system-deleted` Source contrary to accepted ADR-015.

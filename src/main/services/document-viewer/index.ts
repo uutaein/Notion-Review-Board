@@ -90,7 +90,7 @@ export function normalizeDocumentViewerBounds(bounds: DocumentViewerBoundsDto): 
 
 function isIgnorableLoadUrlError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : ''
-  return message.includes('ERR_ABORTED')
+  return /\bERR_[A-Z0-9_]+\b/.test(message)
 }
 
 export function createElectronDocumentViewerController(

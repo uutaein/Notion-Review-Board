@@ -8,14 +8,19 @@
  */
 
 import {
-  ReviewItem,
   getDisplayCategory,
   getDisplayTags,
   isTodayReview,
-  compareReviewItemsByDue
+  compareReviewItemsByDue,
+  type ReviewItem,
+  type ReviewItemStatus
 } from '../../../shared/domain/item'
 import type { ReviewSource } from '../../../shared/domain/source'
+import type { SyncEvent } from '../../../shared/domain/sync'
 import type { DateTimeString, ReviewItemId, ReviewSourceId } from '../../../shared/domain/types'
+import type { SyncEventId } from '../../../shared/domain/types'
+import type { ExcludeReviewItemResultDto } from '../../../shared/review-exclusion'
+import type { ReviewQueueItemDto, ReviewQueueListResultDto } from '../../../shared/review-queue'
 
 /**
  * 렌더러 뷰 모델에 전달할 복습 항목의 데이터 포맷을 나타내는 인터페이스입니다.
@@ -116,6 +121,36 @@ export interface TodayReviewListInput {
 export interface TodayReviewService {
   /** 지정된 시간대 및 정렬/필터 조건에 맞춰 정제된 오늘 복습 대상 목록을 조회합니다. */
   list(input: TodayReviewListInput): TodayReviewListResult
+}
+
+export interface ReviewQueueReader {
+  findByStatuses(statuses: ReviewItemStatus[]): ReviewItem[]
+  findSourceById(id: ReviewSourceId): ReviewSource | null
+}
+
+export interface ReviewQueueServiceDependencies {
+  reader: ReviewQueueReader
+}
+
+export interface ReviewQueueService {
+  list(): ReviewQueueListResultDto
+}
+
+export interface ReviewExclusionPersistence {
+  findReviewItemById(id: ReviewItemId): ReviewItem | null
+  recordStatusAction(item: ReviewItem, event: SyncEvent): void
+}
+
+export interface ReviewExclusionServiceDependencies {
+  persistence: ReviewExclusionPersistence
+  createSyncEventId: () => SyncEventId
+}
+
+export interface ReviewExclusionService {
+  exclude(input: {
+    reviewItemId: ReviewItemId
+    excludedAt: DateTimeString
+  }): ExcludeReviewItemResultDto
 }
 
 /**
@@ -288,6 +323,59 @@ function shuffle<T>(array: T[], random: () => number): T[] {
   return result
 }
 
+function compareQueueItems(a: ReviewItem, b: ReviewItem): number {
+  const dueComparison = compareReviewItemsByDue(a, b)
+  return dueComparison === 0 ? a.id.localeCompare(b.id) : dueComparison
+}
+
+function sourceNamesForItem(item: ReviewItem, reader: ReviewQueueReader): string[] {
+  const sourceIds = Array.from(new Set([item.primarySourceId, ...item.sourceIds]))
+  return sourceIds.map((sourceId) => reader.findSourceById(sourceId)?.name ?? '알 수 없는 Source')
+}
+
+function projectQueueItem(item: ReviewItem, reader: ReviewQueueReader): ReviewQueueItemDto {
+  const primarySource = reader.findSourceById(item.primarySourceId)
+
+  return {
+    id: item.id,
+    title: item.title,
+    sourceId: item.primarySourceId,
+    sourceName: primarySource?.name ?? '알 수 없는 Source',
+    sourceNames: sourceNamesForItem(item, reader),
+    displayCategory: getDisplayCategory(item.category),
+    tags: getDisplayTags(item.tags),
+    originLabel: item.originLabel,
+    dueAt: item.dueAt,
+    lastReviewedAt: item.lastReviewedAt,
+    lastSyncedAt: item.lastSyncedAt,
+    status: 'active',
+    notionUrl: item.notionUrl
+  }
+}
+
+export function createReviewQueueService(
+  dependencies: ReviewQueueServiceDependencies
+): ReviewQueueService {
+  const { reader } = dependencies
+
+  return {
+    list() {
+      const activeItems = [...reader.findByStatuses(['active'])]
+        .filter((item) => item.status === 'active')
+        .sort(compareQueueItems)
+        .map((item) => projectQueueItem(item, reader))
+
+      return {
+        items: activeItems,
+        isEmpty: activeItems.length === 0,
+        emptyReason: activeItems.length === 0 ? 'no-active-items' : null,
+        totalCount: activeItems.length,
+        sort: 'due'
+      }
+    }
+  }
+}
+
 /**
  * 오늘 복습 서비스 인스턴스를 생성하는 팩토리 함수입니다.
  *
@@ -385,6 +473,44 @@ export function createTodayReviewService(
         isEmpty,
         emptyReason: isEmpty ? 'no-due-items' : null,
         sort: activeSort
+      }
+    }
+  }
+}
+
+export function createReviewExclusionService(
+  dependencies: ReviewExclusionServiceDependencies
+): ReviewExclusionService {
+  const { persistence, createSyncEventId } = dependencies
+
+  return {
+    exclude({ reviewItemId, excludedAt }) {
+      const item = persistence.findReviewItemById(reviewItemId)
+      if (!item) throw new Error('REVIEW_ITEM_NOT_FOUND')
+      if (item.status !== 'active') throw new Error('REVIEW_ITEM_NOT_ACTIVE')
+
+      const updated: ReviewItem = {
+        ...item,
+        status: 'archived',
+        updatedAt: excludedAt
+      }
+      const event: SyncEvent = {
+        id: createSyncEventId(),
+        sourceId: item.primarySourceId,
+        reviewItemId,
+        eventType: 'user_action',
+        severity: 'info',
+        message: 'Review item excluded from Today Review',
+        technicalMessage: null,
+        occurredAt: excludedAt
+      }
+
+      persistence.recordStatusAction(updated, event)
+
+      return {
+        itemId: updated.id,
+        status: 'archived',
+        excludedAt
       }
     }
   }

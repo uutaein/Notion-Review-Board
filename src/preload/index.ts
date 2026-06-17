@@ -67,11 +67,20 @@ const todayReview = {
       : ipcRenderer.invoke('review:list-today')
 }
 
+const reviewQueue = {
+  list: (): Promise<any> => ipcRenderer.invoke('review-queue:list')
+}
+
 const reviewRating = {
   rate: (payload: {
     reviewItemId: string
     rating: 'again' | 'hard' | 'good' | 'easy'
   }): Promise<any> => ipcRenderer.invoke('review:rate', payload)
+}
+
+const reviewExclusion = {
+  exclude: (payload: { reviewItemId: string }): Promise<any> =>
+    ipcRenderer.invoke('review:exclude', payload)
 }
 
 const statusPages = {
@@ -102,6 +111,8 @@ contextBridge.exposeInMainWorld('reviewSource', reviewSource)
 contextBridge.exposeInMainWorld('notionMetadata', notionMetadata)
 contextBridge.exposeInMainWorld('manualSync', manualSync)
 contextBridge.exposeInMainWorld('todayReview', todayReview)
+contextBridge.exposeInMainWorld('reviewQueue', reviewQueue)
 contextBridge.exposeInMainWorld('reviewRating', reviewRating)
+contextBridge.exposeInMainWorld('reviewExclusion', reviewExclusion)
 contextBridge.exposeInMainWorld('statusPages', statusPages)
 contextBridge.exposeInMainWorld('documentViewer', documentViewer)

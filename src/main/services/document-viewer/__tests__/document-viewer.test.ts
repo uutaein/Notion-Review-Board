@@ -138,7 +138,7 @@ describe('Document Viewer URL policy', () => {
     expect(parentWindow.focus).toHaveBeenCalled()
   })
 
-  it('still rejects non-redirect internal viewer load failures', async () => {
+  it('keeps the attached viewer open for Electron URL load failures', async () => {
     const view = {
       setBounds: vi.fn(),
       webContents: {
@@ -173,7 +173,12 @@ describe('Document Viewer URL policy', () => {
         url: 'https://www.notion.so/workspace/Page-abc123',
         bounds: { x: 250, y: 150, width: 640, height: 420 }
       })
-    ).rejects.toThrow('ERR_NAME_NOT_RESOLVED')
+    ).resolves.toEqual({
+      opened: true,
+      url: 'https://www.notion.so/workspace/Page-abc123'
+    })
+
+    expect(parentWindow.focus).toHaveBeenCalled()
   })
 
   it('rejects invalid embedded viewer bounds', () => {

@@ -21,13 +21,19 @@ import {
 import { registerSourceMappingIpc } from './ipc/source-mapping'
 import { registerManualSyncIpc } from './ipc/manual-sync'
 import { registerReviewRatingIpc } from './ipc/review-rating'
+import { registerReviewExclusionIpc } from './ipc/review-exclusion'
+import { registerReviewQueueIpc } from './ipc/review-queue'
 import { registerStatusPagesIpc } from './ipc/status-pages'
 import { registerTodayReviewIpc } from './ipc/today-review'
 import { registerDocumentViewerIpc } from './ipc/document-viewer'
 import { createCollectionEngine } from './services/collection'
 import { createDatabaseSyncPersistence } from './services/database'
 import { ProductionNotionPageQueryClient } from './services/notion/sync-query'
-import { createTodayReviewService } from './services/review'
+import {
+  createReviewExclusionService,
+  createReviewQueueService,
+  createTodayReviewService
+} from './services/review'
 import { createFsrsEngine } from './services/scheduler/fsrs-engine'
 import { createSchedulingService } from './services/scheduler'
 import { createStatusPageService } from './services/status-pages'
@@ -244,6 +250,19 @@ app.whenReady().then(() => {
     timeZone: 'Asia/Seoul'
   })
 
+  const reviewQueueService = createReviewQueueService({
+    reader: {
+      findByStatuses: (statuses) => database!.reviewItems.findByStatuses(statuses),
+      findSourceById: (sourceId) => database!.reviewSources.findById(sourceId)
+    }
+  })
+
+  registerReviewQueueIpc({
+    service: reviewQueueService,
+    ipcMain,
+    isValidSender
+  })
+
   const schedulingService = createSchedulingService({
     engine: fsrsEngine,
     persistence: {
@@ -255,6 +274,20 @@ app.whenReady().then(() => {
 
   registerReviewRatingIpc({
     service: schedulingService,
+    ipcMain,
+    isValidSender
+  })
+
+  const reviewExclusionService = createReviewExclusionService({
+    persistence: {
+      findReviewItemById: (reviewItemId) => database!.reviewItems.findById(reviewItemId),
+      recordStatusAction: (item, event) => database!.recordStatusAction(item, event)
+    },
+    createSyncEventId: () => `event_${randomUUID()}` as SyncEventId
+  })
+
+  registerReviewExclusionIpc({
+    service: reviewExclusionService,
     ipcMain,
     isValidSender
   })
